@@ -274,6 +274,19 @@ Enable demo mode in one of two ways:
 
 ## Troubleshooting
 
+### Too Many Verbose Logs
+
+If you see verbose INFO logs instead of clean protocol messages, add this to your `.env` file:
+
+```
+LOG_LEVEL=WARNING
+```
+
+This suppresses INFO logs and only shows:
+- Protocol messages (when emails are sent/received)
+- Callback invocations (when your PlayerAI methods are called)
+- Errors
+
 ### Gmail Authentication Errors
 
 ```bash
