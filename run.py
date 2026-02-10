@@ -43,6 +43,23 @@ Options:
 """)
 
 
+def check_database_initialized():
+    """Check if database tables exist. Returns True if OK, False if not initialized."""
+    try:
+        from q21_player._infra.database.pool import ConnectionPool
+        from sqlalchemy import text
+
+        pool = ConnectionPool()
+        with pool.session() as session:
+            # Check if player_states table exists
+            result = session.execute(text(
+                "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'player_states')"
+            )).scalar()
+            return result
+    except Exception:
+        return False
+
+
 def main():
     """Run the Q21 player with optional demo mode."""
     args = sys.argv[1:]
@@ -61,6 +78,25 @@ def main():
     # Warn if using --scan (single mode)
     if "--scan" in args and "--watch" not in args:
         print("[Note] Using --scan (single scan). For continuous polling, use --watch")
+
+    # Check if running scan/watch modes (need database)
+    if "--scan" in args or "--watch" in args:
+        if "--test-connectivity" not in args:
+            try:
+                if not check_database_initialized():
+                    print("\n" + "=" * 60)
+                    print("  ERROR: Database not initialized!")
+                    print("=" * 60)
+                    print("\n  The database tables have not been created yet.")
+                    print("\n  Run this command first:")
+                    print("    python init_db.py")
+                    print("\n  Then try again:")
+                    print(f"    python run.py {' '.join(sys.argv[1:])}")
+                    print()
+                    return 1
+            except Exception as e:
+                # If we can't check, let it proceed and fail with detailed error
+                pass
 
     # Import and run the main CLI
     try:
