@@ -135,7 +135,7 @@ Environment variables are loaded first, then `js/config.json` values override th
 
 Your project structure:
 ```
-q21-player-template/
+q21-player-sdk/
 ├── .venv/
 ├── js/
 │   └── config.json

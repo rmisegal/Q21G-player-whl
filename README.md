@@ -1,4 +1,4 @@
-# Q21 Player Template
+# Q21 Player SDK
 
 Template project for implementing a Q21 (21-Questions) game player.
 
@@ -7,8 +7,8 @@ Template project for implementing a Q21 (21-Questions) game player.
 ### 1. Clone and Setup
 
 ```bash
-git clone <this-repo>
-cd q21-player-template
+git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
+cd q21-player-sdk
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install q21-player
@@ -44,7 +44,7 @@ q21-player --test-connectivity
 ## Project Structure
 
 ```
-q21-player-template/
+q21-player-sdk/
 ├── js/
 │   └── config.json       # Your configuration
 ├── my_player.py          # Your PlayerAI implementation
