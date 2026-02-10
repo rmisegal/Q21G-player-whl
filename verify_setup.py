@@ -2,11 +2,12 @@
 """Verification script for Q21 Player SDK setup.
 
 Checks that all components are properly configured:
-1. Required files exist
-2. Config is valid
-3. Gmail API works
-4. Database connection works
-5. PlayerAI can be loaded
+1. Required files exist (.env, config.json, credentials)
+2. Environment variables are set
+3. Config has required fields
+4. Gmail API works
+5. Database connection works (optional)
+6. PlayerAI can be loaded
 
 Usage:
     python verify_setup.py
@@ -15,9 +16,9 @@ Usage:
 import argparse
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 
 class Colors:
@@ -58,20 +59,23 @@ class SetupVerifier:
         self.verbose = verbose
         self.errors: list[str] = []
         self.warnings: list[str] = []
-        self.config: Optional[dict] = None
+        self.config: dict = {}
 
-    def check_file_exists(self, path: str, name: str, required: bool = True) -> bool:
-        """Check if a file exists."""
-        if Path(path).exists():
-            ok(f"{name}: {path}")
-            return True
-        if required:
-            fail(f"{name}: {path} (not found)")
-            self.errors.append(f"Missing {name}: {path}")
-        else:
-            warn(f"{name}: {path} (not found, optional)")
-            self.warnings.append(f"Missing optional {name}: {path}")
-        return False
+    def load_env(self) -> None:
+        """Load .env file if it exists."""
+        env_path = Path(".env")
+        if env_path.exists():
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(env_path)
+            except ImportError:
+                # Manual parsing if dotenv not installed
+                with open(env_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
+                            os.environ[key.strip()] = value.strip()
 
     def check_required_files(self) -> bool:
         """Check that required files exist."""
@@ -79,48 +83,97 @@ class SetupVerifier:
 
         results = []
 
-        # Check for config
-        if Path("js/config.json").exists():
-            results.append(self.check_file_exists("js/config.json", "Config"))
+        # .env file
+        if Path(".env").exists():
+            ok(".env file")
+            results.append(True)
         else:
-            fail("Config: js/config.json (not found)")
-            info("Run: python setup_config.py")
-            self.errors.append("Missing config: js/config.json")
+            fail(".env file (not found)")
+            info("Run: python setup.py")
+            self.errors.append("Missing .env file")
             results.append(False)
 
-        # Check for credentials
-        creds_path = "credentials.json"
-        if self.config:
-            creds_path = self.config.get("gmail", {}).get("credentials_path", "credentials.json")
+        # config.json
+        if Path("js/config.json").exists():
+            ok("js/config.json")
+            results.append(True)
+        else:
+            fail("js/config.json (not found)")
+            info("Run: python setup.py")
+            self.errors.append("Missing js/config.json")
+            results.append(False)
 
-        if not Path(creds_path).exists():
+        # credentials.json
+        creds_path = os.getenv("GMAIL_CREDENTIALS_PATH", "credentials.json")
+        if Path(creds_path).exists():
+            ok(f"Gmail credentials: {creds_path}")
+            results.append(True)
+        else:
             fail(f"Gmail credentials: {creds_path} (not found)")
             info("Run: python setup_gmail.py")
-            self.errors.append(f"Missing Gmail credentials: {creds_path}")
+            self.errors.append("Missing Gmail credentials")
             results.append(False)
+
+        # token.json (optional but recommended)
+        token_path = os.getenv("GMAIL_TOKEN_PATH", "token.json")
+        if Path(token_path).exists():
+            ok(f"Gmail token: {token_path}")
         else:
-            results.append(self.check_file_exists(creds_path, "Gmail credentials"))
-
-        # Check for token (optional but recommended)
-        token_path = "token.json"
-        if self.config:
-            token_path = self.config.get("gmail", {}).get("token_path", "token.json")
-
-        if not Path(token_path).exists():
             warn(f"Gmail token: {token_path} (not found)")
             info("Will be created on first Gmail connection")
             self.warnings.append("Gmail token not yet created")
-        else:
-            ok(f"Gmail token: {token_path}")
 
-        # Check for my_player.py
-        results.append(self.check_file_exists("my_player.py", "PlayerAI module"))
+        # my_player.py
+        if Path("my_player.py").exists():
+            ok("my_player.py")
+            results.append(True)
+        else:
+            fail("my_player.py (not found)")
+            self.errors.append("Missing my_player.py")
+            results.append(False)
 
         return all(results)
 
+    def check_env_vars(self) -> bool:
+        """Check that required environment variables are set."""
+        header("2. Environment Variables")
+
+        required_vars = [
+            ("GMAIL_ACCOUNT", "Gmail account"),
+            ("GMAIL_CREDENTIALS_PATH", "Gmail credentials path"),
+        ]
+
+        optional_vars = [
+            ("GTAI_DB_HOST", "Database host"),
+            ("GTAI_DB_NAME", "Database name"),
+            ("GTAI_DB_USER", "Database user"),
+        ]
+
+        all_ok = True
+
+        for var, desc in required_vars:
+            value = os.getenv(var)
+            if value:
+                # Mask sensitive parts
+                display = value if "@" not in value else value
+                ok(f"{desc}: {display}")
+            else:
+                fail(f"{desc}: {var} not set")
+                self.errors.append(f"{var} not set in .env")
+                all_ok = False
+
+        for var, desc in optional_vars:
+            value = os.getenv(var)
+            if value:
+                ok(f"{desc}: {value}")
+            else:
+                warn(f"{desc}: {var} not set")
+
+        return all_ok
+
     def check_config(self) -> bool:
-        """Check that config is valid."""
-        header("2. Configuration")
+        """Check that config.json is valid and has required fields."""
+        header("3. Configuration (js/config.json)")
 
         config_path = Path("js/config.json")
         if not config_path.exists():
@@ -130,75 +183,59 @@ class SetupVerifier:
         try:
             with open(config_path) as f:
                 self.config = json.load(f)
-            ok("Config file is valid JSON")
+            ok("Valid JSON")
         except json.JSONDecodeError as e:
-            fail(f"Config file has invalid JSON: {e}")
+            fail(f"Invalid JSON: {e}")
             self.errors.append("Invalid JSON in config.json")
             return False
 
-        # Check required sections
-        required_sections = ["gmail", "database", "league", "player"]
-        missing = [s for s in required_sections if s not in self.config]
-        if missing:
-            fail(f"Missing config sections: {', '.join(missing)}")
-            self.errors.append(f"Missing config sections: {missing}")
-            return False
-        ok("All required config sections present")
+        all_ok = True
 
-        # Check Gmail config
-        gmail = self.config.get("gmail", {})
-        if not gmail.get("account"):
-            fail("gmail.account is empty")
-            self.errors.append("Empty gmail.account")
-        elif "@" not in gmail.get("account", ""):
-            fail(f"gmail.account doesn't look like an email: {gmail.get('account')}")
-            self.errors.append("Invalid gmail.account")
-        else:
-            ok(f"Gmail account: {gmail.get('account')}")
-
-        # Check player config
+        # Check player section
         player = self.config.get("player", {})
         if player.get("user_id"):
-            ok(f"Player ID: {player.get('user_id')}")
+            ok(f"player.user_id: {player['user_id']}")
         else:
-            fail("player.user_id is empty")
-            self.errors.append("Empty player.user_id")
+            fail("player.user_id: not set")
+            self.errors.append("player.user_id not set")
+            all_ok = False
 
-        # Check league config
+        if player.get("display_name"):
+            ok(f"player.display_name: {player['display_name']}")
+        else:
+            warn("player.display_name: not set")
+
+        # Check league section
         league = self.config.get("league", {})
         if league.get("manager_email"):
-            ok(f"League manager: {league.get('manager_email')}")
+            ok(f"league.manager_email: {league['manager_email']}")
         else:
-            fail("league.manager_email is empty")
-            self.errors.append("Empty league.manager_email")
+            fail("league.manager_email: not set")
+            self.errors.append("league.manager_email not set")
+            all_ok = False
 
-        # Check demo mode
+        # Check app section
         app = self.config.get("app", {})
-        demo_mode = app.get("demo_mode", False)
-        if demo_mode:
-            info("Demo mode is ENABLED")
+        if app.get("player_ai_module"):
+            ok(f"app.player_ai_module: {app['player_ai_module']}")
         else:
-            info("Demo mode is disabled (using my_player.py)")
+            warn("app.player_ai_module: not set (using default)")
 
-        return len([e for e in self.errors if "config" in e.lower()]) == 0
+        return all_ok
 
     def check_gmail(self) -> bool:
         """Check Gmail API connection."""
-        header("3. Gmail API")
+        header("4. Gmail API")
 
-        if not self.config:
-            fail("Cannot check Gmail without valid config")
-            return False
-
-        creds_path = Path(self.config.get("gmail", {}).get("credentials_path", "credentials.json"))
-        token_path = Path(self.config.get("gmail", {}).get("token_path", "token.json"))
+        token_path = Path(os.getenv("GMAIL_TOKEN_PATH", "token.json"))
+        creds_path = Path(os.getenv("GMAIL_CREDENTIALS_PATH", "credentials.json"))
 
         if not creds_path.exists():
-            fail(f"Credentials file not found: {creds_path}")
+            fail(f"Credentials not found: {creds_path}")
             return False
 
         if not token_path.exists():
-            warn("Token file not found - Gmail not yet authenticated")
+            warn("Token not found - Gmail not yet authenticated")
             info("Run: python setup_gmail.py")
             self.warnings.append("Gmail not yet authenticated")
             return True  # Not a fatal error
@@ -225,13 +262,13 @@ class SetupVerifier:
             profile = service.users().getProfile(userId="me").execute()
             email = profile.get("emailAddress", "unknown")
 
-            ok(f"Connected to Gmail as: {email}")
+            ok(f"Connected as: {email}")
 
-            # Verify email matches config
-            config_email = self.config.get("gmail", {}).get("account", "")
-            if email.lower() != config_email.lower():
-                warn(f"Gmail account mismatch: config has {config_email}")
-                self.warnings.append(f"Gmail account mismatch: authenticated as {email}, config has {config_email}")
+            # Verify email matches .env
+            env_email = os.getenv("GMAIL_ACCOUNT", "")
+            if email.lower() != env_email.lower():
+                warn(f"Email mismatch: .env has {env_email}")
+                self.warnings.append(f"Gmail account mismatch")
 
             return True
 
@@ -242,68 +279,63 @@ class SetupVerifier:
             return False
         except Exception as e:
             fail(f"Gmail connection failed: {e}")
-            self.errors.append(f"Gmail connection failed: {e}")
+            self.errors.append(f"Gmail error: {e}")
             return False
 
     def check_database(self) -> bool:
-        """Check database connection."""
-        header("4. Database")
+        """Check database connection (optional)."""
+        header("5. Database")
 
-        if not self.config:
-            fail("Cannot check database without valid config")
-            return False
+        host = os.getenv("GTAI_DB_HOST")
+        if not host:
+            info("Database not configured (optional)")
+            return True
 
-        db_config = self.config.get("database", {})
-        host = db_config.get("host", "localhost")
-        port = db_config.get("port", 5432)
-        name = db_config.get("name", "q21_player")
-        user = db_config.get("user", "postgres")
+        port = os.getenv("GTAI_DB_PORT", "5432")
+        name = os.getenv("GTAI_DB_NAME", "gtai_player")
+        user = os.getenv("GTAI_DB_USER", "postgres")
+        password = os.getenv("GTAI_DB_PASSWORD", "")
 
-        info(f"Database: {user}@{host}:{port}/{name}")
+        info(f"Connecting to: {user}@{host}:{port}/{name}")
 
         try:
             import psycopg2
 
             conn = psycopg2.connect(
                 host=host,
-                port=port,
+                port=int(port),
                 dbname=name,
                 user=user,
-                password=db_config.get("password", ""),
+                password=password,
                 connect_timeout=5
             )
             conn.close()
-            ok("Database connection successful")
+            ok("Connection successful")
             return True
 
         except ImportError:
             warn("psycopg2 not installed - cannot verify database")
-            info("Database check skipped (install psycopg2 to verify)")
-            self.warnings.append("Cannot verify database: psycopg2 not installed")
+            info("Install with: pip install psycopg2-binary")
+            self.warnings.append("Cannot verify database")
             return True
         except Exception as e:
-            fail(f"Database connection failed: {e}")
-            self.errors.append(f"Database connection failed: {e}")
+            fail(f"Connection failed: {e}")
+            self.errors.append(f"Database error: {e}")
             return False
 
     def check_player_ai(self) -> bool:
         """Check that PlayerAI can be loaded."""
-        header("5. PlayerAI")
+        header("6. PlayerAI")
 
-        if not self.config:
-            fail("Cannot check PlayerAI without valid config")
-            return False
-
-        app_config = self.config.get("app", {})
-        demo_mode = app_config.get("demo_mode", False)
-
+        # Check for demo mode
+        demo_mode = os.getenv("DEMO_MODE", "false").lower() == "true"
         if demo_mode:
             info("Demo mode enabled - using built-in DemoAI")
-            ok("DemoAI will be used for game responses")
+            ok("DemoAI will be used")
             return True
 
-        module_name = app_config.get("player_ai_module", "my_player")
-        class_name = app_config.get("player_ai_class", "MyPlayerAI")
+        module_name = self.config.get("app", {}).get("player_ai_module", "my_player")
+        class_name = self.config.get("app", {}).get("player_ai_class", "MyPlayerAI")
 
         info(f"Loading: {module_name}.{class_name}")
 
@@ -314,28 +346,28 @@ class SetupVerifier:
 
             # Check required methods
             required_methods = ["get_warmup_answer", "get_questions", "get_guess", "on_score_received"]
-            missing_methods = [m for m in required_methods if not hasattr(instance, m)]
+            missing = [m for m in required_methods if not hasattr(instance, m)]
 
-            if missing_methods:
-                fail(f"Missing methods: {', '.join(missing_methods)}")
-                self.errors.append(f"PlayerAI missing methods: {missing_methods}")
+            if missing:
+                fail(f"Missing methods: {', '.join(missing)}")
+                self.errors.append(f"PlayerAI missing: {missing}")
                 return False
 
-            ok(f"PlayerAI loaded: {class_name}")
+            ok(f"Loaded: {class_name}")
             ok("All required methods present")
             return True
 
         except ImportError as e:
-            fail(f"Cannot import module '{module_name}': {e}")
-            self.errors.append(f"Cannot import PlayerAI module: {e}")
+            fail(f"Cannot import '{module_name}': {e}")
+            self.errors.append(f"Cannot import PlayerAI: {e}")
             return False
-        except AttributeError as e:
-            fail(f"Class '{class_name}' not found in module '{module_name}'")
-            self.errors.append(f"PlayerAI class not found: {e}")
+        except AttributeError:
+            fail(f"Class '{class_name}' not found in '{module_name}'")
+            self.errors.append(f"PlayerAI class not found")
             return False
         except Exception as e:
             fail(f"Error loading PlayerAI: {e}")
-            self.errors.append(f"PlayerAI load error: {e}")
+            self.errors.append(f"PlayerAI error: {e}")
             return False
 
     def run(self) -> bool:
@@ -344,7 +376,10 @@ class SetupVerifier:
         print("  Q21 Player SDK - Setup Verification")
         print("=" * 50)
 
-        # Load config first
+        # Load .env first
+        self.load_env()
+
+        # Load config
         if Path("js/config.json").exists():
             try:
                 with open("js/config.json") as f:
@@ -352,37 +387,37 @@ class SetupVerifier:
             except:
                 pass
 
-        results = [
-            self.check_required_files(),
-            self.check_config(),
-            self.check_gmail(),
-            self.check_database(),
-            self.check_player_ai(),
-        ]
+        # Run checks
+        self.check_required_files()
+        self.check_env_vars()
+        self.check_config()
+        self.check_gmail()
+        self.check_database()
+        self.check_player_ai()
 
         # Summary
         header("Summary")
 
         if self.errors:
-            fail(f"{len(self.errors)} error(s) found:")
+            fail(f"{len(self.errors)} error(s):")
             for error in self.errors:
-                print(f"      - {error}")
+                print(f"      • {error}")
         else:
-            ok("No errors found")
+            ok("No errors")
 
         if self.warnings:
             warn(f"{len(self.warnings)} warning(s):")
             for warning in self.warnings:
-                print(f"      - {warning}")
+                print(f"      • {warning}")
 
         if not self.errors:
-            print(f"\n  {Colors.GREEN}{Colors.BOLD}Setup is complete!{Colors.RESET}")
+            print(f"\n  {Colors.GREEN}{Colors.BOLD}Setup complete!{Colors.RESET}")
             print("\n  You can now run:")
             print("    python run.py --scan --demo   # Test with demo mode")
             print("    python run.py --scan          # Run with your PlayerAI")
         else:
             print(f"\n  {Colors.RED}{Colors.BOLD}Setup incomplete.{Colors.RESET}")
-            print("\n  Fix the errors above and run this script again.")
+            print("\n  Fix the errors above, then run this script again.")
 
         print()
         return len(self.errors) == 0
@@ -390,12 +425,11 @@ class SetupVerifier:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify Q21 Player SDK setup")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show verbose output")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
     verifier = SetupVerifier(verbose=args.verbose)
-    success = verifier.run()
-    return 0 if success else 1
+    return 0 if verifier.run() else 1
 
 
 if __name__ == "__main__":

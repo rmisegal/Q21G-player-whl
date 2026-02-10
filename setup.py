@@ -3,12 +3,14 @@
 
 Runs all setup steps in the correct order:
 1. Gmail OAuth (gets your email automatically)
-2. Configuration (pre-fills email from OAuth)
-3. Verification
+2. Database configuration
+3. Player identity and league settings
+4. Verification
 
 Usage:
     python setup.py
     python setup.py --skip-gmail    # Skip Gmail setup if already done
+    python setup.py --skip-db       # Skip database setup
     python setup.py --skip-verify   # Skip verification step
 """
 import argparse
@@ -25,7 +27,7 @@ def print_header(text: str) -> None:
 
 
 def print_step(num: int, total: int, text: str) -> None:
-    print(f"\n  Step {num}/{total}: {text}")
+    print(f"\n  [{num}/{total}] {text}")
     print("  " + "-" * 50)
 
 
@@ -83,9 +85,9 @@ def check_credentials_file(path: Path) -> bool:
         return False
 
 
-def setup_gmail() -> tuple[bool, str]:
-    """Setup Gmail OAuth and return (success, email)."""
-    print_header("Gmail OAuth Setup")
+def setup_gmail() -> tuple[bool, str, str, str]:
+    """Setup Gmail OAuth and return (success, email, creds_path, token_path)."""
+    print_header("Step 1: Gmail OAuth")
 
     credentials_path = Path("credentials.json")
     token_path = Path("token.json")
@@ -111,7 +113,7 @@ def setup_gmail() -> tuple[bool, str]:
                 print(f"  Already authenticated as: {email}")
 
                 if ask_yes_no("Use this account?", default=True):
-                    return True, email
+                    return True, email, str(credentials_path), str(token_path)
                 else:
                     print("  Will re-authenticate...")
         except Exception:
@@ -122,31 +124,22 @@ def setup_gmail() -> tuple[bool, str]:
         print("""
   You need OAuth credentials from Google Cloud Console.
 
-  If you don't have them yet:
+  Quick setup:
     1. Go to https://console.cloud.google.com/
-    2. Create a new project (or select existing)
-    3. Enable the Gmail API:
-       - Go to "APIs & Services" > "Library"
-       - Search for "Gmail API" and enable it
-    4. Configure OAuth consent screen:
-       - Go to "APIs & Services" > "OAuth consent screen"
-       - Select "External" > Create
-       - Fill required fields, add your email as test user
-    5. Create OAuth credentials:
-       - Go to "APIs & Services" > "Credentials"
-       - Click "Create Credentials" > "OAuth client ID"
-       - Choose "Desktop app" as application type
-       - Download the JSON file
+    2. Create project → Enable Gmail API
+    3. OAuth consent screen → Add yourself as test user
+    4. Credentials → Create OAuth client ID (Desktop app)
+    5. Download the JSON file
 """)
-        source_input = ask("Path to your downloaded credentials JSON file")
+        source_input = ask("Path to your downloaded credentials JSON")
         source_path = Path(source_input).expanduser()
 
         if not source_path.exists():
             print(f"\n    Error: File not found: {source_path}")
-            return False, ""
+            return False, "", "", ""
 
         if not check_credentials_file(source_path):
-            return False, ""
+            return False, "", "", ""
 
         shutil.copy(source_path, credentials_path)
         print(f"  Copied credentials to: {credentials_path}")
@@ -187,23 +180,43 @@ def setup_gmail() -> tuple[bool, str]:
         profile = service.users().getProfile(userId="me").execute()
         email = profile.get("emailAddress", "")
 
-        print(f"\n  Authenticated as: {email}")
-        print(f"  Token saved to: {token_path}")
+        print(f"\n  ✓ Authenticated as: {email}")
+        print(f"  ✓ Token saved to: {token_path}")
 
-        return True, email
+        return True, email, str(credentials_path), str(token_path)
 
     except ImportError:
         print("    Error: Required packages not installed.")
         print("    Run: pip install google-auth-oauthlib google-api-python-client")
-        return False, ""
+        return False, "", "", ""
     except Exception as e:
         print(f"    OAuth flow failed: {e}")
-        return False, ""
+        return False, "", "", ""
 
 
-def setup_config(gmail_account: str = "") -> bool:
-    """Setup configuration file."""
-    print_header("Player Configuration")
+def setup_database() -> tuple[str, str, str, str, str]:
+    """Setup database configuration. Returns (host, port, name, user, password)."""
+    print_header("Step 2: Database Configuration")
+    print("\n  PostgreSQL database for storing game state.\n")
+
+    use_database = ask_yes_no("Do you have a PostgreSQL database set up?", default=True)
+
+    if use_database:
+        db_host = ask("Database host", default="localhost")
+        db_port = ask("Database port", default="5432")
+        db_name = ask("Database name", default="gtai_player")
+        db_user = ask("Database user", default="postgres")
+        db_password = ask("Database password", password=True)
+        return db_host, db_port, db_name, db_user, db_password
+    else:
+        print("\n    Note: Some features may not work without a database.")
+        print("    You can set this up later in .env")
+        return "localhost", "5432", "gtai_player", "postgres", ""
+
+
+def setup_player_config(gmail_account: str = "") -> bool:
+    """Setup player identity and league settings in config.json."""
+    print_header("Step 3: Player & League Configuration")
 
     config_path = Path("js/config.json")
 
@@ -212,73 +225,34 @@ def setup_config(gmail_account: str = "") -> bool:
             print("  Keeping existing configuration.")
             return True
 
-    # Player Information
-    print("\n  --- Player Information ---")
-    print("  Your identity in the Q21 league.\n")
+    # Player Identity
+    print("\n  --- Your Player Identity ---\n")
 
-    if gmail_account:
-        print(f"  Gmail account: {gmail_account} (from OAuth)")
-        player_email = gmail_account
-    else:
-        player_email = ask("Your Gmail address")
+    user_id = ask("Your user ID (provided by instructor)")
 
-    default_name = player_email.split("@")[0] if player_email else ""
-    player_name = ask("Your display name", default=default_name)
-    player_id = ask("Your player ID (from instructor)", default=default_name)
+    default_name = user_id if user_id else ""
+    display_name = ask("Your display name", default=default_name)
 
-    # League Configuration
-    print("\n  --- League Configuration ---")
-    print("  Information from your instructor.\n")
+    # League Settings
+    print("\n  --- League Settings ---\n")
 
-    league_manager_email = ask("League Manager email")
-    league_id = ask("League ID", default="LEAGUE001")
+    manager_email = ask("League Manager email (provided by instructor)")
 
-    # Database Configuration
-    print("\n  --- Database Configuration ---")
-    print("  PostgreSQL database for storing game state.\n")
-
-    use_database = ask_yes_no("Do you have a PostgreSQL database?", default=True)
-
-    if use_database:
-        db_host = ask("Database host", default="localhost")
-        db_port = ask("Database port", default="5432")
-        db_name = ask("Database name", default="q21_player")
-        db_user = ask("Database user", default="postgres")
-        db_password = ask("Database password", password=True)
-    else:
-        print("    Note: Some features may not work without a database.")
-        db_host, db_port, db_name, db_user, db_password = "localhost", "5432", "q21_player", "postgres", ""
-
-    # Demo Mode
-    print("\n  --- Demo Mode ---")
-    demo_mode = ask_yes_no("Enable demo mode by default?", default=False)
-
-    # Generate config
+    # Generate config.json
     config = {
-        "app": {
-            "player_ai_module": "my_player",
-            "player_ai_class": "MyPlayerAI",
-            "demo_mode": demo_mode
-        },
-        "gmail": {
-            "account": player_email,
-            "credentials_path": "credentials.json",
-            "token_path": "token.json"
-        },
-        "database": {
-            "host": db_host,
-            "port": int(db_port),
-            "name": db_name,
-            "user": db_user,
-            "password": db_password
-        },
         "league": {
-            "manager_email": league_manager_email,
-            "league_id": league_id
+            "manager_email": manager_email,
+            "league_id": "LEAGUE001",
+            "protocol_version": "league.v2"
         },
         "player": {
-            "user_id": player_id,
-            "display_name": player_name
+            "user_id": user_id,
+            "display_name": display_name,
+            "game_types": ["q21"]
+        },
+        "app": {
+            "player_ai_module": "my_player",
+            "player_ai_class": "MyPlayerAI"
         }
     }
 
@@ -287,58 +261,113 @@ def setup_config(gmail_account: str = "") -> bool:
         json.dump(config, f, indent=2)
         f.write("\n")
 
-    print(f"\n  Created: {config_path}")
+    print(f"\n  ✓ Created: {config_path}")
+    return True
 
-    # Generate .env
+
+def generate_env_file(
+    gmail_account: str,
+    creds_path: str,
+    token_path: str,
+    db_host: str,
+    db_port: str,
+    db_name: str,
+    db_user: str,
+    db_password: str
+) -> None:
+    """Generate .env file with all environment variables."""
     env_path = Path(".env")
+
     env_lines = [
         "# Q21 Player SDK Environment Configuration",
+        "# Generated by setup.py - DO NOT COMMIT",
         "",
-        "# Gmail",
-        f"GMAIL_ACCOUNT={player_email}",
-        f"GMAIL_CREDENTIALS_PATH=credentials.json",
-        f"GMAIL_TOKEN_PATH=token.json",
+        "# =============================================================================",
+        "# Gmail API Configuration",
+        "# =============================================================================",
+        f"GMAIL_ACCOUNT={gmail_account}",
+        f"GMAIL_CREDENTIALS_PATH={creds_path}",
+        f"GMAIL_TOKEN_PATH={token_path}",
         "",
-        "# Database",
+        "# =============================================================================",
+        "# Database Configuration",
+        "# =============================================================================",
         f"GTAI_DB_HOST={db_host}",
         f"GTAI_DB_PORT={db_port}",
         f"GTAI_DB_NAME={db_name}",
         f"GTAI_DB_USER={db_user}",
         f"GTAI_DB_PASSWORD={db_password}",
         "",
-        "# App",
-        f"DEMO_MODE={'true' if demo_mode else 'false'}",
+        "# =============================================================================",
+        "# Application Settings",
+        "# =============================================================================",
+        "POLL_INTERVAL_SEC=30",
+        "DEMO_MODE=false",
+        "",
+        "# =============================================================================",
+        "# LLM Configuration (Optional)",
+        "# =============================================================================",
+        "# LLM_METHOD=cli",
+        "# LLM_DEFAULT_AGENT=CLAUDE_STRATEGY",
+        "# LLM_TIMEOUT_SEC=120",
+        "# LLM_MAX_RETRIES=3",
+        "# LLM_FALLBACK_ENABLED=true",
+        "",
+        "# API Keys (only needed if LLM_METHOD=api)",
+        "# ANTHROPIC_API_KEY=sk-ant-your-key-here",
+        "# OPENAI_API_KEY=sk-your-key-here",
         "",
     ]
 
     with open(env_path, "w") as f:
         f.write("\n".join(env_lines))
 
-    print(f"  Created: {env_path}")
-
-    return True
+    print(f"  ✓ Created: {env_path}")
 
 
 def verify_setup() -> bool:
     """Run quick verification."""
-    print_header("Verification")
+    print_header("Step 4: Verification")
 
     issues = []
 
     # Check files
-    files_to_check = [
+    checks = [
         ("js/config.json", "Configuration"),
         ("credentials.json", "Gmail credentials"),
         ("token.json", "Gmail token"),
         ("my_player.py", "PlayerAI module"),
+        (".env", "Environment file"),
     ]
 
-    for path, name in files_to_check:
+    for path, name in checks:
         if Path(path).exists():
             print(f"  ✓ {name}")
         else:
             print(f"  ✗ {name} (missing)")
             issues.append(f"Missing: {path}")
+
+    # Check config has required fields
+    config_path = Path("js/config.json")
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                config = json.load(f)
+
+            if config.get("player", {}).get("user_id"):
+                print(f"  ✓ Player ID: {config['player']['user_id']}")
+            else:
+                print("  ✗ Player ID not set")
+                issues.append("player.user_id not set in config.json")
+
+            if config.get("league", {}).get("manager_email"):
+                print(f"  ✓ League Manager: {config['league']['manager_email']}")
+            else:
+                print("  ✗ League Manager not set")
+                issues.append("league.manager_email not set in config.json")
+        except Exception as e:
+            print(f"  ✗ Config error: {e}")
+            issues.append(f"Config error: {e}")
 
     # Quick Gmail check
     try:
@@ -351,15 +380,13 @@ def verify_setup() -> bool:
             creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
             service = build("gmail", "v1", credentials=creds)
             profile = service.users().getProfile(userId="me").execute()
-            print(f"  ✓ Gmail API ({profile.get('emailAddress', 'connected')})")
-        else:
-            issues.append("Gmail not authenticated")
+            print(f"  ✓ Gmail API: {profile.get('emailAddress', 'connected')}")
     except Exception as e:
-        print(f"  ✗ Gmail API ({e})")
+        print(f"  ✗ Gmail API: {e}")
         issues.append(f"Gmail error: {e}")
 
     if issues:
-        print(f"\n  {len(issues)} issue(s) found. Run 'python verify_setup.py' for details.")
+        print(f"\n  {len(issues)} issue(s) found.")
         return False
 
     print("\n  All checks passed!")
@@ -369,6 +396,7 @@ def verify_setup() -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Setup Q21 Player SDK")
     parser.add_argument("--skip-gmail", action="store_true", help="Skip Gmail OAuth setup")
+    parser.add_argument("--skip-db", action="store_true", help="Skip database setup")
     parser.add_argument("--skip-verify", action="store_true", help="Skip verification")
     args = parser.parse_args()
 
@@ -379,38 +407,56 @@ def main() -> int:
     print("  Press Enter to accept default values shown in [brackets].")
 
     gmail_account = ""
+    creds_path = "credentials.json"
+    token_path = "token.json"
+    db_host, db_port, db_name, db_user, db_password = "localhost", "5432", "gtai_player", "postgres", ""
 
     # Step 1: Gmail OAuth
     if not args.skip_gmail:
-        success, gmail_account = setup_gmail()
+        success, gmail_account, creds_path, token_path = setup_gmail()
         if not success:
             print("\n  Gmail setup failed. You can retry with: python setup_gmail.py")
-            if not ask_yes_no("Continue with config setup anyway?", default=False):
+            if not ask_yes_no("Continue anyway?", default=False):
                 return 1
+            gmail_account = ask("Your Gmail address")
 
-    # Step 2: Configuration
-    if not setup_config(gmail_account):
+    # Step 2: Database
+    if not args.skip_db:
+        db_host, db_port, db_name, db_user, db_password = setup_database()
+
+    # Step 3: Player & League config
+    if not setup_player_config(gmail_account):
         return 1
 
-    # Step 3: Verification
+    # Generate .env file
+    print_header("Generating .env file")
+    if not gmail_account:
+        gmail_account = ask("Your Gmail address")
+    generate_env_file(
+        gmail_account, creds_path, token_path,
+        db_host, db_port, db_name, db_user, db_password
+    )
+
+    # Step 4: Verification
     if not args.skip_verify:
         verify_setup()
 
     # Done
     print_header("Setup Complete!")
     print("""
+  Files created:
+    • .env           - Gmail & database credentials
+    • js/config.json - Player identity & league settings
+
   Next steps:
 
-  1. Verify full setup:
-     python verify_setup.py
+    1. Test with demo mode:
+       python run.py --scan --demo
 
-  2. Test with demo mode:
-     python run.py --scan --demo
+    2. Implement your AI in my_player.py
 
-  3. Implement your AI in my_player.py
-
-  4. Run with your implementation:
-     python run.py --scan
+    3. Run with your implementation:
+       python run.py --scan
 """)
 
     return 0
