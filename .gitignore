@@ -7,8 +7,12 @@ env/
 __pycache__/
 *.py[cod]
 *.egg-info/
-dist/
 build/
+
+# Include wheel files for SDK distribution
+!dist/
+dist/*
+!dist/*.whl
 
 # Secrets - NEVER commit these
 credentials.json

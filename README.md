@@ -11,7 +11,7 @@ git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
 cd q21-player-sdk
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install q21-player
+pip install dist/q21_player-1.0.0-py3-none-any.whl
 ```
 
 ### 2. Configure
@@ -45,6 +45,8 @@ q21-player --test-connectivity
 
 ```
 q21-player-sdk/
+├── dist/
+│   └── q21_player-1.0.0-py3-none-any.whl  # SDK package
 ├── js/
 │   └── config.json       # Your configuration
 ├── my_player.py          # Your PlayerAI implementation
