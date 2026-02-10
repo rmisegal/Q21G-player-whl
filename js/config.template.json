@@ -1,7 +1,8 @@
 {
   "app": {
     "player_ai_module": "my_player",
-    "player_ai_class": "MyPlayerAI"
+    "player_ai_class": "MyPlayerAI",
+    "demo_mode": false
   },
   "gmail": {
     "account": "your-email@gmail.com",

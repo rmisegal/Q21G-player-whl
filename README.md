@@ -16,8 +16,23 @@ pip install dist/q21_player-1.0.0-py3-none-any.whl
 
 ### 2. Configure
 
-1. Copy your `credentials.json` from Google Cloud Console to this folder
-2. Edit `js/config.json` with your settings (see `CONFIG_GUIDE.md`)
+Run the interactive setup script:
+
+```bash
+python setup_config.py
+```
+
+This will ask you for:
+- **Player info**: Your Gmail, display name, player ID
+- **Gmail OAuth**: Path to credentials.json (get from Google Cloud Console)
+- **Database**: PostgreSQL connection details
+- **League**: Manager email and league ID (provided by instructor)
+
+The script generates:
+- `js/config.json` - Main configuration file
+- `.env` - Environment variables
+
+**Manual setup**: If you prefer, copy `js/config.template.json` to `js/config.json` and edit manually.
 
 ### 3. Implement Your Player
 
@@ -31,15 +46,25 @@ Edit `my_player.py` - implement the four required methods:
 ### 4. Run
 
 ```bash
-# Single scan (process messages once)
-q21-player --scan
+# Test connectivity first
+python run.py --test-connectivity
+
+# Demo mode - test with predictable responses (no LLM needed)
+python run.py --scan --demo
+
+# Production mode - uses your my_player.py implementation
+python run.py --scan
 
 # Continuous mode (poll for messages)
-q21-player --watch
-
-# Test connectivity first
-q21-player --test-connectivity
+python run.py --watch
+python run.py --watch --demo  # Demo mode continuous
 ```
+
+**Demo Mode**: Use `--demo` flag to test the system with predictable responses before implementing your own AI. Demo mode:
+- Returns "4" for warmup questions
+- Generates 20 demo yes/no questions
+- Makes a fixed guess with 75% confidence
+- No LLM or API keys required
 
 ## Architecture
 
@@ -105,8 +130,12 @@ The SDK uses a layered architecture for handling protocol messages:
 
 ```
 q21-player-sdk/
+├── setup_config.py            # Interactive configuration setup
+├── run.py                     # Entry point with --demo support
+├── my_player.py               # Your PlayerAI implementation
 ├── _infra/                    # Protocol infrastructure
 │   ├── router.py              # MessageRouter - unified entry point
+│   ├── demo_ai.py             # DemoAI for testing
 │   ├── rlgm/                   # League-level components
 │   │   ├── controller.py      # RLGMController
 │   │   ├── league_handler.py  # BROADCAST_* handlers
@@ -119,8 +148,9 @@ q21-player-sdk/
 ├── dist/
 │   └── q21_player-*.whl       # SDK package
 ├── js/
-│   └── config.json            # Your configuration
-├── my_player.py               # Your PlayerAI implementation
+│   ├── config.template.json   # Configuration template
+│   └── config.json            # Your configuration (DO NOT COMMIT)
+├── .env                       # Environment variables (DO NOT COMMIT)
 ├── credentials.json           # Gmail OAuth credentials (DO NOT COMMIT)
 ├── token.json                 # OAuth token (DO NOT COMMIT)
 └── docs/
@@ -129,13 +159,21 @@ q21-player-sdk/
 
 ## Configuration
 
-See `CONFIG_GUIDE.md` for detailed explanations of each config field.
+Run `python setup_config.py` to generate configuration interactively.
 
 Key settings in `js/config.json`:
-- `gmail.account` - Your Gmail address
-- `gmail.credentials_path` - Path to OAuth credentials
-- `player.user_id` - Your unique player ID
-- `league.manager_email` - League Manager's email
+
+| Section | Field | Description |
+|---------|-------|-------------|
+| `gmail.account` | Your Gmail address | Used for sending/receiving game messages |
+| `gmail.credentials_path` | OAuth credentials file | Download from Google Cloud Console |
+| `player.user_id` | Your player ID | Provided by instructor |
+| `player.display_name` | Your display name | Shown in game results |
+| `league.manager_email` | League Manager email | Provided by instructor |
+| `database.*` | PostgreSQL settings | For storing game state |
+| `app.demo_mode` | Enable demo mode | Use `true` for testing |
+
+See `CONFIG_GUIDE.md` for detailed explanations.
 
 ## Game Flow
 
@@ -161,7 +199,23 @@ Key settings in `js/config.json`:
 
 ## Tips
 
+- **Start with demo mode** - Run `python run.py --scan --demo` to verify your setup works before implementing your AI
 - **Justifications must be 35+ words** - The `sentence_justification` and `word_justification` fields require detailed explanations
 - **20 questions exactly** - `get_questions()` must return exactly 20 questions
 - **Options format** - Each question needs `{"A": "...", "B": "...", "C": "...", "D": "..."}`
 - **Test locally** - Use `--test-connectivity` to verify Gmail and database setup
+
+## Demo Mode
+
+Demo mode provides predictable responses for testing the system integration:
+
+| Method | Demo Response |
+|--------|---------------|
+| `get_warmup_answer()` | Returns `{"answer": "4"}` |
+| `get_questions()` | Returns 20 demo questions with A/B/C/D options |
+| `get_guess()` | Returns fixed opening sentence, "demo" word, 75% confidence |
+| `on_score_received()` | Prints score to console |
+
+Enable demo mode in one of two ways:
+1. **CLI flag**: `python run.py --scan --demo`
+2. **Config**: Set `"demo_mode": true` in `js/config.json`

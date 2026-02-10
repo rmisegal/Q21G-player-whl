@@ -18,6 +18,7 @@ dist/*
 credentials.json
 token.json
 .env
+js/config.json
 
 # IDE
 .idea/

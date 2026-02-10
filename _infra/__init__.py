@@ -11,8 +11,10 @@ Components:
     GMController - handles individual game execution
     GPRM - game parameters for game execution
     GameResult - result of game execution
+    DemoAI - demo PlayerAI for testing without LLM
 """
 from _infra.router import MessageRouter, RoutingResult
+from _infra.demo_ai import DemoAI
 from _infra.rlgm import (
     GPRM,
     GameResult,
@@ -33,6 +35,8 @@ __all__ = [
     # Main router
     "MessageRouter",
     "RoutingResult",
+    # Demo AI
+    "DemoAI",
     # RLGM components
     "RLGMController",
     "LeagueHandler",
