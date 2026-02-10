@@ -6,12 +6,29 @@ SDK for implementing a Q21 (21-Questions) game player that communicates with the
 
 ### 1. Clone and Install
 
+#### macOS / Linux
+
 ```bash
 git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
 cd q21-player-sdk
-python3.11 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install dist/q21_player-1.0.0-py3-none-any.whl
+pip install dist/q21_player-1.0.1-py3-none-any.whl
+```
+
+#### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
+cd q21-player-sdk
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install dist/q21_player-1.0.1-py3-none-any.whl
+```
+
+If you get an execution policy error on Windows, run this first:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 ### 2. Setup Google Cloud (Gmail API)
