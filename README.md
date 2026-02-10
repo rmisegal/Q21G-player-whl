@@ -73,7 +73,7 @@ This unified wizard:
 2. **Configuration** - Asks for player ID, league info, database settings
 3. **Verification** - Confirms everything is working
 
-The wizard will prompt for your downloaded credentials JSON when needed.
+The wizard will prompt for your downloaded client_secret JSON file when needed.
 
 ### 4. Initialize Database
 

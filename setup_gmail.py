@@ -168,7 +168,7 @@ def main() -> int:
   Example (Windows): C:\\Users\\YourName\\Downloads\\client_secret_123456.json
   Example (macOS):   /Users/YourName/Downloads/client_secret_123456.json
 """)
-        source_input = ask("Full path to your downloaded credentials JSON file")
+        source_input = ask("Full path to your downloaded client_secret JSON file")
         source_path = Path(source_input).expanduser()
 
     if not source_path.exists():
