@@ -1,0 +1,26 @@
+{
+  "app": {
+    "player_ai_module": "my_player",
+    "player_ai_class": "MyPlayerAI"
+  },
+  "gmail": {
+    "account": "your-email@gmail.com",
+    "credentials_path": "credentials.json",
+    "token_path": "token.json"
+  },
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "q21_player",
+    "user": "postgres",
+    "password": "your-password"
+  },
+  "league": {
+    "manager_email": "referee@example.com",
+    "league_id": "LEAGUE001"
+  },
+  "player": {
+    "user_id": "student001",
+    "display_name": "Student Name"
+  }
+}
