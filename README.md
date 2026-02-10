@@ -4,7 +4,7 @@ SDK for implementing a Q21 (21-Questions) game player that communicates with the
 
 ## Quick Start
 
-### 1. Clone and Setup
+### 1. Clone and Install
 
 ```bash
 git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
@@ -14,27 +14,50 @@ source .venv/bin/activate
 pip install dist/q21_player-1.0.0-py3-none-any.whl
 ```
 
-### 2. Configure
+### 2. Setup Google Cloud (Gmail API)
 
-Run the interactive setup script:
+The SDK uses Gmail to communicate with the game server. You need OAuth credentials from Google Cloud.
+
+#### Create OAuth Credentials (one-time setup)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select existing)
+3. **Enable Gmail API**:
+   - Go to **APIs & Services** → **Library**
+   - Search for "Gmail API" → Click **Enable**
+4. **Configure OAuth consent screen**:
+   - Go to **APIs & Services** → **OAuth consent screen**
+   - Select **External** → **Create**
+   - Fill in: App name, User support email, Developer contact
+   - Click through to "Test users" → Add your Gmail address
+5. **Create credentials**:
+   - Go to **APIs & Services** → **Credentials**
+   - Click **Create Credentials** → **OAuth client ID**
+   - Application type: **Desktop app**
+   - Click **Create** → **Download JSON**
+
+### 3. Run Setup Wizard
 
 ```bash
-python setup_config.py
+python setup.py
 ```
 
-This will ask you for:
-- **Player info**: Your Gmail, display name, player ID
-- **Gmail OAuth**: Path to credentials.json (get from Google Cloud Console)
-- **Database**: PostgreSQL connection details
-- **League**: Manager email and league ID (provided by instructor)
+This unified wizard:
+1. **Gmail OAuth** - Authenticates with Google (auto-detects your email)
+2. **Configuration** - Asks for player ID, league info, database settings
+3. **Verification** - Confirms everything is working
 
-The script generates:
-- `js/config.json` - Main configuration file
-- `.env` - Environment variables
+The wizard will prompt for your downloaded credentials JSON when needed.
 
-**Manual setup**: If you prefer, copy `js/config.template.json` to `js/config.json` and edit manually.
+### 4. Test with Demo Mode
 
-### 3. Implement Your Player
+```bash
+python run.py --scan --demo
+```
+
+Demo mode uses predictable responses - no AI implementation needed yet.
+
+### 5. Implement Your Player
 
 Edit `my_player.py` - implement the four required methods:
 
@@ -43,28 +66,19 @@ Edit `my_player.py` - implement the four required methods:
 - `get_guess()` - Guess the opening sentence based on answers
 - `on_score_received()` - Handle score notification
 
-### 4. Run
+### 6. Run
 
 ```bash
-# Test connectivity first
-python run.py --test-connectivity
-
-# Demo mode - test with predictable responses (no LLM needed)
-python run.py --scan --demo
-
-# Production mode - uses your my_player.py implementation
+# Single scan - process messages once
 python run.py --scan
 
-# Continuous mode (poll for messages)
+# Continuous mode - poll for messages
 python run.py --watch
-python run.py --watch --demo  # Demo mode continuous
-```
 
-**Demo Mode**: Use `--demo` flag to test the system with predictable responses before implementing your own AI. Demo mode:
-- Returns "4" for warmup questions
-- Generates 20 demo yes/no questions
-- Makes a fixed guess with 75% confidence
-- No LLM or API keys required
+# With demo mode (for testing)
+python run.py --scan --demo
+python run.py --watch --demo
+```
 
 ## Architecture
 
@@ -130,7 +144,10 @@ The SDK uses a layered architecture for handling protocol messages:
 
 ```
 q21-player-sdk/
-├── setup_config.py            # Interactive configuration setup
+├── setup.py                   # Unified setup wizard (start here!)
+├── setup_gmail.py             # Gmail OAuth setup (standalone)
+├── setup_config.py            # Configuration generator (standalone)
+├── verify_setup.py            # Setup verification script
 ├── run.py                     # Entry point with --demo support
 ├── my_player.py               # Your PlayerAI implementation
 ├── _infra/                    # Protocol infrastructure
@@ -219,3 +236,48 @@ Demo mode provides predictable responses for testing the system integration:
 Enable demo mode in one of two ways:
 1. **CLI flag**: `python run.py --scan --demo`
 2. **Config**: Set `"demo_mode": true` in `js/config.json`
+
+## Troubleshooting
+
+### Gmail Authentication Errors
+
+```bash
+# Re-run Gmail setup
+python setup_gmail.py
+
+# Or delete token and re-authenticate
+rm token.json
+python setup_gmail.py
+```
+
+### "Credentials file not found"
+
+Make sure you've completed the Google Cloud setup:
+```bash
+python setup_gmail.py --credentials /path/to/downloaded/client_secret_*.json
+```
+
+### "Access blocked: This app's request is invalid"
+
+Your OAuth consent screen may not be configured correctly:
+1. Go to Google Cloud Console → APIs & Services → OAuth consent screen
+2. Make sure your Gmail is added as a test user
+3. Re-download credentials and run `python setup_gmail.py` again
+
+### Database Connection Failed
+
+```bash
+# Check PostgreSQL is running
+pg_isready
+
+# Create database if needed
+createdb q21_player
+```
+
+### Verify Everything
+
+```bash
+python verify_setup.py
+```
+
+This will identify exactly what's missing or misconfigured.
