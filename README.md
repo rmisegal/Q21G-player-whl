@@ -31,6 +31,15 @@ If you get an execution policy error on Windows, run this first:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
+#### Updating After Git Pull
+
+When you pull new changes, reinstall the wheel to get updates:
+
+```bash
+git pull
+pip install --force-reinstall dist/q21_player-1.0.1-py3-none-any.whl
+```
+
 ### 2. Setup Google Cloud (Gmail API)
 
 The SDK uses Gmail to communicate with the game server. You need OAuth credentials from Google Cloud.
