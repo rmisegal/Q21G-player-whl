@@ -19,6 +19,20 @@ Options:
 """
 import os
 import sys
+from pathlib import Path
+
+# Load .env BEFORE any q21_player imports (so LOG_LEVEL is available to logger)
+def _load_env():
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), value.strip())
+
+_load_env()
 
 
 def show_help():
