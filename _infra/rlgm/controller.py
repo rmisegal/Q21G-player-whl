@@ -86,9 +86,10 @@ class RLGMController:
             self._round_manager.set_assignments(round_number, assignments)
 
         elif msg_type == LeagueHandler.NEW_ROUND:
-            assignments = self._league_handler.handle_new_league_round(payload)
+            # NEW_ROUND is a transition message - it just signals the round is starting.
+            # Assignments should already be stored from BROADCAST_ASSIGNMENT_TABLE.
+            # We retrieve them from RoundManager (which may query a database).
             round_number = payload.get("round_number", 1)
-            self._round_manager.set_assignments(round_number, assignments)
             self._round_manager.set_current_round(round_number)
             games_to_run = self._round_manager.get_games_for_round(round_number)
 
