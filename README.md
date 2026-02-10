@@ -49,15 +49,23 @@ This unified wizard:
 
 The wizard will prompt for your downloaded credentials JSON when needed.
 
-### 4. Test with Demo Mode
+### 4. Initialize Database
 
 ```bash
-python run.py --scan --demo
+python init_db.py
+```
+
+This creates all required tables in your PostgreSQL database.
+
+### 5. Test with Demo Mode
+
+```bash
+python run.py --watch --demo
 ```
 
 Demo mode uses predictable responses - no AI implementation needed yet.
 
-### 5. Implement Your Player
+### 6. Implement Your Player
 
 Edit `my_player.py` - implement the four required methods:
 
@@ -66,7 +74,7 @@ Edit `my_player.py` - implement the four required methods:
 - `get_guess()` - Guess the opening sentence based on answers
 - `on_score_received()` - Handle score notification
 
-### 6. Run
+### 7. Run
 
 ```bash
 # Single scan - process messages once
@@ -145,6 +153,7 @@ The SDK uses a layered architecture for handling protocol messages:
 ```
 q21-player-sdk/
 ├── setup.py                   # Unified setup wizard (start here!)
+├── init_db.py                 # Database schema initialization
 ├── setup_gmail.py             # Gmail OAuth setup (standalone)
 ├── setup_config.py            # Configuration generator (standalone)
 ├── verify_setup.py            # Setup verification script
