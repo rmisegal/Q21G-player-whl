@@ -36,8 +36,8 @@ class MessageRouter:
         "LEAGUE_",
     )
 
-    # Q21 game message prefix
-    Q21_PREFIX = "Q21_"
+    # Q21 game message prefix (Q21G.v1 protocol - no underscore after Q21)
+    Q21_PREFIX = "Q21"
 
     def __init__(
         self,
@@ -142,10 +142,6 @@ class MessageRouter:
     def get_rlgm(self) -> RLGMController:
         """Get the RLGM controller for direct access."""
         return self._rlgm
-
-    def get_standings(self) -> dict[str, Any]:
-        """Get current player standings."""
-        return self._rlgm.get_standings()
 
     def is_registered(self) -> bool:
         """Check if player is registered."""

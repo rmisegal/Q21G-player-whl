@@ -18,27 +18,19 @@ class LeagueResponse:
 class LeagueHandler:
     """Handles League Manager broadcast messages.
 
-    Message types handled:
+    Message types handled (per UNIFIED_PROTOCOL.md):
     - BROADCAST_START_SEASON -> SEASON_REGISTRATION_REQUEST
     - SEASON_REGISTRATION_RESPONSE -> (acknowledgment)
-    - BROADCAST_ASSIGNMENT_TABLE -> GROUP_ASSIGNMENT_RESPONSE
-    - BROADCAST_NEW_LEAGUE_ROUND -> (triggers games)
-    - BROADCAST_ROUND_RESULTS -> (updates scores)
-    - BROADCAST_KEEP_ALIVE -> KEEP_ALIVE_RESPONSE
-    - BROADCAST_CRITICAL_* -> CRITICAL_*_RESPONSE
+    - BROADCAST_ASSIGNMENT_TABLE -> (store assignments)
+    - BROADCAST_NEW_LEAGUE_ROUND -> (triggers games, transition message)
     - LEAGUE_COMPLETED -> (finalize season)
     """
 
-    # Message type constants
+    # Message type constants (per protocol)
     START_SEASON = "BROADCAST_START_SEASON"
     REGISTRATION_RESPONSE = "SEASON_REGISTRATION_RESPONSE"
     ASSIGNMENT_TABLE = "BROADCAST_ASSIGNMENT_TABLE"
     NEW_ROUND = "BROADCAST_NEW_LEAGUE_ROUND"
-    ROUND_RESULTS = "BROADCAST_ROUND_RESULTS"
-    KEEP_ALIVE = "BROADCAST_KEEP_ALIVE"
-    CRITICAL_PAUSE = "BROADCAST_CRITICAL_PAUSE"
-    CRITICAL_CONTINUE = "BROADCAST_CRITICAL_CONTINUE"
-    CRITICAL_RESET = "BROADCAST_CRITICAL_RESET"
     LEAGUE_COMPLETED = "LEAGUE_COMPLETED"
 
     def __init__(self, player_email: str = "", player_name: str = "") -> None:
@@ -52,10 +44,6 @@ class LeagueHandler:
         self._player_name = player_name
         self._registered = False
         self._season_id: Optional[str] = None
-        # Score tracking for callback optimization
-        self._total_score: float = 0.0
-        self._games_played: int = 0
-        self._rank: int = 0
 
     def handle_start_season(
         self,
@@ -112,29 +100,32 @@ class LeagueHandler:
     ) -> LeagueResponse:
         """Handle BROADCAST_ASSIGNMENT_TABLE - acknowledge assignments.
 
+        Protocol format per assignment:
+        - role: "player1", "player2", or "referee"
+        - email: participant's email
+        - game_id: 7-digit SSRRGGG format (e.g., "0101001")
+        - group_id: group identifier
+
         Args:
-            payload: Assignment table with round assignments.
+            payload: Assignment table with season assignments.
             sender: League Manager email.
 
         Returns:
-            LeagueResponse with GROUP_ASSIGNMENT_RESPONSE.
+            LeagueResponse acknowledging receipt.
         """
-        round_number = payload.get("round_number", 1)
         assignments = payload.get("assignments", [])
 
-        # Filter assignments for this player
+        # Filter assignments for this player (role is player1 or player2)
         my_assignments = [
             a for a in assignments
-            if a.get("player_email") == self._player_email
-            or a.get("player_a_email") == self._player_email
-            or a.get("player_b_email") == self._player_email
+            if a.get("email") == self._player_email
+            and a.get("role") in ("player1", "player2")
         ]
 
         return LeagueResponse(
             message_type="GROUP_ASSIGNMENT_RESPONSE",
             payload={
                 "season_id": self._season_id,
-                "round_number": round_number,
                 "player_email": self._player_email,
                 "assignments_received": len(my_assignments),
                 "status": "ACKNOWLEDGED",
@@ -142,183 +133,62 @@ class LeagueHandler:
             recipient=sender,
         )
 
-    def handle_new_league_round(
+    def parse_assignments_for_player(
         self,
-        payload: Dict[str, Any]
+        assignments: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Handle BROADCAST_NEW_LEAGUE_ROUND - prepare for games.
+        """Parse protocol-format assignments and enrich for this player.
+
+        Protocol assignment format:
+        - role: "player1", "player2", or "referee"
+        - email: participant's email
+        - game_id: 7-digit SSRRGGG format
+        - group_id: group identifier
 
         Args:
-            payload: New round payload with round info.
+            assignments: Raw assignments from BROADCAST_ASSIGNMENT_TABLE.
 
         Returns:
-            List of assignment dicts for the round.
+            List of enriched assignment dicts for games where this player participates.
         """
-        round_number = payload.get("round_number", 1)
-        assignments = payload.get("assignments", [])
-
-        # Filter and enrich assignments for this player
-        my_assignments = []
+        # Group assignments by game_id to find participants per game
+        games: Dict[str, Dict[str, str]] = {}
         for a in assignments:
-            is_player_a = a.get("player_a_email") == self._player_email
-            is_player_b = a.get("player_b_email") == self._player_email
-            is_player = a.get("player_email") == self._player_email
+            game_id = a.get("game_id", "")
+            if game_id not in games:
+                games[game_id] = {"game_id": game_id, "group_id": a.get("group_id", "")}
+            role = a.get("role", "")
+            email = a.get("email", "")
+            games[game_id][role] = email
 
-            if is_player_a or is_player_b or is_player:
+        # Filter games where this player participates
+        my_assignments = []
+        for game_id, game_info in games.items():
+            my_role = None
+            if game_info.get("player1") == self._player_email:
+                my_role = "PLAYER1"
+            elif game_info.get("player2") == self._player_email:
+                my_role = "PLAYER2"
+
+            if my_role:
+                # Parse round_number from game_id (format: SSRRGGG)
+                round_number = int(game_id[2:4]) if len(game_id) >= 4 else 1
+
                 enriched = {
-                    "match_id": a.get("match_id", ""),
-                    "game_id": a.get("game_id", ""),
+                    "game_id": game_id,
+                    "match_id": game_id,  # Use game_id as match_id
                     "round_number": round_number,
-                    "referee_email": a.get("referee_email", ""),
-                    "my_role": "PLAYER_A" if is_player_a else "PLAYER_B",
-                    "book_name": a.get("book_name", ""),
-                    "book_hint": a.get("book_hint", a.get("book_description", "")),
-                    "association_domain": a.get("association_domain", ""),
+                    "referee_email": game_info.get("referee", ""),
+                    "my_role": my_role,
+                    "opponent_email": (
+                        game_info.get("player2") if my_role == "PLAYER1"
+                        else game_info.get("player1")
+                    ),
+                    "group_id": game_info.get("group_id", ""),
                 }
-                # Add opponent email
-                if is_player_a:
-                    enriched["opponent_email"] = a.get("player_b_email")
-                elif is_player_b:
-                    enriched["opponent_email"] = a.get("player_a_email")
-
                 my_assignments.append(enriched)
 
         return my_assignments
-
-    def handle_round_results(
-        self,
-        payload: Dict[str, Any]
-    ) -> None:
-        """Handle BROADCAST_ROUND_RESULTS - update internal scores.
-
-        Updates internal score tracking for callback optimization.
-        The player can use this to adjust strategy based on standings.
-
-        Args:
-            payload: Round results with standings.
-        """
-        standings = payload.get("standings", [])
-
-        # Find this player's position in standings
-        for i, entry in enumerate(standings, 1):
-            if entry.get("player_email") == self._player_email:
-                self._total_score = float(entry.get("total_score", 0.0))
-                self._games_played = int(entry.get("games_played", 0))
-                self._rank = i
-                break
-
-    def handle_keep_alive(
-        self,
-        payload: Dict[str, Any],
-        sender: str
-    ) -> LeagueResponse:
-        """Handle BROADCAST_KEEP_ALIVE - respond to heartbeat.
-
-        Args:
-            payload: Keep alive payload.
-            sender: League Manager email.
-
-        Returns:
-            LeagueResponse with KEEP_ALIVE_RESPONSE.
-        """
-        return LeagueResponse(
-            message_type="KEEP_ALIVE_RESPONSE",
-            payload={
-                "player_email": self._player_email,
-                "machine_state": "READY",
-                "season_id": self._season_id,
-            },
-            recipient=sender,
-        )
-
-    def get_standings(self) -> Dict[str, Any]:
-        """Get current standings for this player.
-
-        Returns:
-            Dict with total_score, games_played, and rank.
-        """
-        return {
-            "total_score": self._total_score,
-            "games_played": self._games_played,
-            "rank": self._rank,
-        }
-
-    def handle_critical_pause(
-        self,
-        payload: Dict[str, Any],
-        sender: str
-    ) -> LeagueResponse:
-        """Handle BROADCAST_CRITICAL_PAUSE - acknowledge pause.
-
-        Args:
-            payload: Pause payload with reason.
-            sender: League Manager email.
-
-        Returns:
-            LeagueResponse with CRITICAL_PAUSE_RESPONSE.
-        """
-        return LeagueResponse(
-            message_type="CRITICAL_PAUSE_RESPONSE",
-            payload={
-                "player_email": self._player_email,
-                "status": "PAUSED",
-                "season_id": self._season_id,
-            },
-            recipient=sender,
-        )
-
-    def handle_critical_continue(
-        self,
-        payload: Dict[str, Any],
-        sender: str
-    ) -> LeagueResponse:
-        """Handle BROADCAST_CRITICAL_CONTINUE - acknowledge continue.
-
-        Args:
-            payload: Continue payload.
-            sender: League Manager email.
-
-        Returns:
-            LeagueResponse with CRITICAL_CONTINUE_RESPONSE.
-        """
-        return LeagueResponse(
-            message_type="CRITICAL_CONTINUE_RESPONSE",
-            payload={
-                "player_email": self._player_email,
-                "status": "RESUMED",
-                "season_id": self._season_id,
-            },
-            recipient=sender,
-        )
-
-    def handle_critical_reset(
-        self,
-        payload: Dict[str, Any],
-        sender: str
-    ) -> LeagueResponse:
-        """Handle BROADCAST_CRITICAL_RESET - acknowledge and reset state.
-
-        Args:
-            payload: Reset payload.
-            sender: League Manager email.
-
-        Returns:
-            LeagueResponse with CRITICAL_RESET_RESPONSE.
-        """
-        # Reset internal state
-        self._total_score = 0.0
-        self._games_played = 0
-        self._rank = 0
-
-        return LeagueResponse(
-            message_type="CRITICAL_RESET_RESPONSE",
-            payload={
-                "player_email": self._player_email,
-                "status": "RESET_COMPLETE",
-                "season_id": self._season_id,
-            },
-            recipient=sender,
-        )
 
     def handle_league_completed(
         self,
@@ -326,31 +196,32 @@ class LeagueHandler:
     ) -> Dict[str, Any]:
         """Handle LEAGUE_COMPLETED - finalize season.
 
-        GAP FIX #2: This method was missing in the original
-        GmailAsPlayer implementation.
+        Protocol payload fields:
+        - broadcast_id: Unique broadcast identifier
+        - season_id: Season identifier
+        - final_standings: Array of {rank, participant_id, display_name, total_points}
+        - message_text: Optional message
 
         Args:
             payload: League completed payload with final standings.
 
         Returns:
-            Dict with final standings info.
+            Dict with this player's final standings info.
         """
         final_standings = payload.get("final_standings", [])
-        winner = payload.get("winner", {})
 
-        # Update final standings for this player
-        for i, entry in enumerate(final_standings, 1):
-            if entry.get("player_email") == self._player_email:
-                self._total_score = float(entry.get("total_score", 0.0))
-                self._games_played = int(entry.get("games_played", 0))
-                self._rank = i
+        # Find this player in final standings
+        my_rank = 0
+        my_points = 0
+        for entry in final_standings:
+            if entry.get("participant_id") == self._player_email:
+                my_rank = entry.get("rank", 0)
+                my_points = entry.get("total_points", 0)
                 break
 
         return {
             "season_id": self._season_id,
-            "final_rank": self._rank,
-            "final_score": self._total_score,
-            "games_played": self._games_played,
-            "winner_email": winner.get("player_email", ""),
+            "final_rank": my_rank,
+            "total_points": my_points,
             "season_complete": True,
         }

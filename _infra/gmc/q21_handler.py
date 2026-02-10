@@ -19,27 +19,34 @@ class Q21Response:
 class Q21Handler:
     """Routes Q21 messages to appropriate game phase handlers.
 
-    Handles the following message types:
-    - Q21_WARMUP_CALL -> execute warmup phase
-    - Q21_ROUND_START -> initialize round and trigger questions
-    - Q21_QUESTIONS_CALL -> generate questions
-    - Q21_ANSWERS_BATCH -> receive answers and submit guess
-    - Q21_SCORE_FEEDBACK -> handle score notification
+    Handles the following message types (Q21G.v1 protocol - no underscores):
+    - Q21WARMUPCALL -> execute warmup phase
+    - Q21ROUNDSTART -> initialize round and trigger questions
+    - Q21ANSWERSBATCH -> receive answers and submit guess
+    - Q21SCOREFEEDBACK -> handle score notification
+
+    Response message types:
+    - Q21WARMUPRESPONSE
+    - Q21QUESTIONSBATCH
+    - Q21GUESSSUBMISSION
     """
 
-    # Message type constants
-    WARMUP_CALL = "Q21_WARMUP_CALL"
-    ROUND_START = "Q21_ROUND_START"
-    QUESTIONS_CALL = "Q21_QUESTIONS_CALL"
-    ANSWERS_BATCH = "Q21_ANSWERS_BATCH"
-    SCORE_FEEDBACK = "Q21_SCORE_FEEDBACK"
+    # Message type constants (Q21G.v1 protocol - NO underscores)
+    WARMUP_CALL = "Q21WARMUPCALL"
+    ROUND_START = "Q21ROUNDSTART"
+    ANSWERS_BATCH = "Q21ANSWERSBATCH"
+    SCORE_FEEDBACK = "Q21SCOREFEEDBACK"
+
+    # Response message types
+    WARMUP_RESPONSE = "Q21WARMUPRESPONSE"
+    QUESTIONS_BATCH = "Q21QUESTIONSBATCH"
+    GUESS_SUBMISSION = "Q21GUESSSUBMISSION"
 
     def __init__(self) -> None:
         """Initialize the Q21Handler with message routing table."""
         self._handlers: dict[str, Callable[..., Optional[Q21Response]]] = {
             self.WARMUP_CALL: self._handle_warmup,
             self.ROUND_START: self._handle_round_start,
-            self.QUESTIONS_CALL: self._handle_questions,
             self.ANSWERS_BATCH: self._handle_answers,
             self.SCORE_FEEDBACK: self._handle_score,
         }
@@ -80,7 +87,7 @@ class Q21Handler:
         player_email: str,
         request_id: Optional[str]
     ) -> Q21Response:
-        """Handle Q21_WARMUP_CALL - solve warmup question."""
+        """Handle Q21WARMUPCALL - solve warmup question."""
         raise NotImplementedError("Q21Handler._handle_warmup() - Part 4")
 
     def _handle_round_start(
@@ -90,18 +97,8 @@ class Q21Handler:
         player_email: str,
         request_id: Optional[str]
     ) -> Q21Response:
-        """Handle Q21_ROUND_START - store book info and trigger questions."""
+        """Handle Q21ROUNDSTART - receive book info and respond with Q21QUESTIONSBATCH."""
         raise NotImplementedError("Q21Handler._handle_round_start() - Part 5")
-
-    def _handle_questions(
-        self,
-        payload: dict[str, Any],
-        sender: str,
-        player_email: str,
-        request_id: Optional[str]
-    ) -> Q21Response:
-        """Handle Q21_QUESTIONS_CALL - generate 20 questions."""
-        raise NotImplementedError("Q21Handler._handle_questions() - Part 5")
 
     def _handle_answers(
         self,
@@ -110,7 +107,7 @@ class Q21Handler:
         player_email: str,
         request_id: Optional[str]
     ) -> Q21Response:
-        """Handle Q21_ANSWERS_BATCH - receive answers and submit guess."""
+        """Handle Q21ANSWERSBATCH - receive answers and respond with Q21GUESSSUBMISSION."""
         raise NotImplementedError("Q21Handler._handle_answers() - Part 6")
 
     def _handle_score(
@@ -120,8 +117,8 @@ class Q21Handler:
         player_email: str,
         request_id: Optional[str]
     ) -> Optional[Q21Response]:
-        """Handle Q21_SCORE_FEEDBACK - process game score.
+        """Handle Q21SCOREFEEDBACK - process game score.
 
-        Returns None as score feedback doesn't require a response.
+        Returns None as score feedback doesn't require a response (terminal message).
         """
         raise NotImplementedError("Q21Handler._handle_score() - Part 7")

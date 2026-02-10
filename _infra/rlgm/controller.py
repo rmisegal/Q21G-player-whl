@@ -43,6 +43,7 @@ class RLGMController:
         self._gprm_builder = GPRMBuilder()
         self._gmc = GMController(player_ai=player_ai)
         self._auth_token = ""
+        self._round_assignments: dict[int, list] = {}  # round_number -> assignments
 
     def set_auth_token(self, token: str) -> None:
         """Set authentication token for game requests."""
@@ -81,9 +82,18 @@ class RLGMController:
 
         elif msg_type == LeagueHandler.ASSIGNMENT_TABLE:
             response = self._league_handler.handle_assignment_table(payload, sender)
-            round_number = payload.get("round_number", 1)
-            assignments = self._league_handler.handle_new_league_round(payload)
-            self._round_manager.set_assignments(round_number, assignments)
+            # Parse and store all assignments for the season (grouped by round)
+            raw_assignments = payload.get("assignments", [])
+            enriched = self._league_handler.parse_assignments_for_player(raw_assignments)
+            # Group by round_number and store
+            for assignment in enriched:
+                round_number = assignment.get("round_number", 1)
+                if round_number not in self._round_assignments:
+                    self._round_assignments[round_number] = []
+                self._round_assignments[round_number].append(assignment)
+            # Store in round manager
+            for round_num, assignments in self._round_assignments.items():
+                self._round_manager.set_assignments(round_num, assignments)
 
         elif msg_type == LeagueHandler.NEW_ROUND:
             # NEW_ROUND is a transition message - it just signals the round is starting.
@@ -92,21 +102,6 @@ class RLGMController:
             round_number = payload.get("round_number", 1)
             self._round_manager.set_current_round(round_number)
             games_to_run = self._round_manager.get_games_for_round(round_number)
-
-        elif msg_type == LeagueHandler.ROUND_RESULTS:
-            self._league_handler.handle_round_results(payload)
-
-        elif msg_type == LeagueHandler.KEEP_ALIVE:
-            response = self._league_handler.handle_keep_alive(payload, sender)
-
-        elif msg_type == LeagueHandler.CRITICAL_PAUSE:
-            response = self._league_handler.handle_critical_pause(payload, sender)
-
-        elif msg_type == LeagueHandler.CRITICAL_CONTINUE:
-            response = self._league_handler.handle_critical_continue(payload, sender)
-
-        elif msg_type == LeagueHandler.CRITICAL_RESET:
-            response = self._league_handler.handle_critical_reset(payload, sender)
 
         elif msg_type == LeagueHandler.LEAGUE_COMPLETED:
             self._league_handler.handle_league_completed(payload)
@@ -146,10 +141,6 @@ class RLGMController:
     def get_gmc(self) -> GMController:
         """Get the GMController for direct game handling."""
         return self._gmc
-
-    def get_standings(self) -> dict[str, Any]:
-        """Get current player standings."""
-        return self._league_handler.get_standings()
 
     def is_registered(self) -> bool:
         """Check if player is registered."""

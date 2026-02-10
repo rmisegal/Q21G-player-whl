@@ -78,37 +78,39 @@ class GameExecutor:
     def handle_round_start(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Handle round start - store book info for questions phase.
 
-        Args:
-            payload: Round start payload with:
-                - match_id: Game match identifier
-                - book_name: Name of the book/lecture
-                - book_description or description: Book hint (15 words)
-                - associative_domain: Domain for associative word
+        Q21ROUNDSTART payload fields (per protocol):
+            - match_id: Game match identifier
+            - book_name: Name of the book/lecture
+            - book_hint: Book hint (15 words)
+            - association_word: Word from association domain (e.g., "color")
+            - questions_required: Number of questions (20)
+            - deadline: Question submission deadline
+            - auth_token: Authentication token
 
         Returns:
             dict with stored book info for the round.
         """
         match_id = payload.get("match_id", "")
         book_name = payload.get("book_name", "")
-        book_hint = payload.get("book_description") or payload.get("description", "")
-        association_domain = payload.get("associative_domain", "")
+        book_hint = payload.get("book_hint", "")
+        association_word = payload.get("association_word", "")
 
         return {
             "match_id": match_id,
             "book_name": book_name,
             "book_hint": book_hint,
-            "association_domain": association_domain,
+            "association_word": association_word,
         }
 
     def execute_questions(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute questions phase - generate 20 strategic questions.
 
         Args:
-            payload: Questions call payload with:
+            payload: Q21ROUNDSTART payload with:
                 - match_id: Game match identifier
                 - book_name: Name of the book/lecture
-                - book_description or description: Book hint
-                - associative_domain: Domain for associative word
+                - book_hint: Book hint (15 words)
+                - association_word: Word from association domain
 
         Returns:
             dict with:
@@ -117,8 +119,8 @@ class GameExecutor:
         """
         match_id = payload.get("match_id", "")
         book_name = payload.get("book_name", "")
-        book_hint = payload.get("book_description") or payload.get("description", "")
-        association_word = payload.get("associative_domain", "")
+        book_hint = payload.get("book_hint", "")
+        association_word = payload.get("association_word", "")
 
         # Build context for PlayerAI callback
         ctx = {
@@ -167,9 +169,9 @@ class GameExecutor:
             payload: Payload with:
                 - match_id: Game match identifier
                 - book_name: Name of the book/lecture
-                - book_description or description: Book hint
-                - associative_domain: Domain for associative word
-                - answers: List of 20 answers (A/B/C/D)
+                - book_hint: Book hint (15 words)
+                - association_word: Word from association domain
+                - answers: List of answers (A/B/C/D or "Not Relevant")
 
         Returns:
             dict with:
@@ -179,8 +181,8 @@ class GameExecutor:
         """
         match_id = payload.get("match_id", "")
         book_name = payload.get("book_name", "")
-        book_hint = payload.get("book_description") or payload.get("description", "")
-        association_word = payload.get("associative_domain", "")
+        book_hint = payload.get("book_hint", "")
+        association_word = payload.get("association_word", "")
         answers = payload.get("answers", [])
 
         # Build context for PlayerAI callback

@@ -11,17 +11,21 @@ from _infra.rlgm.gprm import GPRM
 
 @dataclass
 class Assignment:
-    """Represents a single game assignment."""
-    match_id: str
-    game_id: str
-    round_number: int
-    game_number: int
+    """Represents a single game assignment.
+
+    Protocol game_id format: SSRRGGG (7 digits)
+    - SS: Season number (01-99)
+    - RR: Round number (01-99)
+    - GGG: Game number (001-999)
+    """
+    game_id: str           # 7-digit SSRRGGG format
+    match_id: str          # Same as game_id
+    round_number: int      # Extracted from game_id[2:4]
+    game_number: int       # Extracted from game_id[4:7]
     referee_email: str
     opponent_email: Optional[str]
-    my_role: str
-    book_name: str = ""
-    book_hint: str = ""
-    association_domain: str = ""
+    my_role: str           # "PLAYER1" or "PLAYER2"
+    group_id: str = ""
 
 
 class RoundManager:
@@ -63,21 +67,23 @@ class RoundManager:
 
         Args:
             round_number: The round number.
-            assignments: List of assignment dicts from League Manager.
+            assignments: List of enriched assignment dicts from LeagueHandler.
         """
         parsed = []
-        for i, a in enumerate(assignments, 1):
+        for a in assignments:
+            game_id = a.get("game_id", "")
+            # Extract game_number from game_id (last 3 digits)
+            game_number = int(game_id[4:7]) if len(game_id) >= 7 else 1
+
             parsed.append(Assignment(
-                match_id=a.get("match_id", f"S{self._season_id}R{round_number}G{i:03d}"),
-                game_id=a.get("game_id", f"{round_number:02d}{i:03d}"),
-                round_number=round_number,
-                game_number=i,
+                game_id=game_id,
+                match_id=a.get("match_id", game_id),
+                round_number=a.get("round_number", round_number),
+                game_number=game_number,
                 referee_email=a.get("referee_email", ""),
                 opponent_email=a.get("opponent_email"),
-                my_role=a.get("my_role", "PLAYER_A"),
-                book_name=a.get("book_name", ""),
-                book_hint=a.get("book_hint", a.get("book_description", "")),
-                association_domain=a.get("association_domain", ""),
+                my_role=a.get("my_role", "PLAYER1"),
+                group_id=a.get("group_id", ""),
             ))
         self._assignments[round_number] = parsed
 
@@ -98,7 +104,12 @@ class RoundManager:
         return [self._build_gprm(a) for a in assignments]
 
     def _build_gprm(self, assignment: Assignment) -> GPRM:
-        """Build GPRM from assignment data."""
+        """Build GPRM from assignment data.
+
+        Note: Book info (book_name, book_hint, association_word) is NOT
+        available at assignment time - it comes from Q21ROUNDSTART message.
+        These fields are left empty in the initial GPRM.
+        """
         return GPRM(
             match_id=assignment.match_id,
             game_id=assignment.game_id,
@@ -108,9 +119,9 @@ class RoundManager:
             referee_email=assignment.referee_email,
             opponent_email=assignment.opponent_email,
             my_role=assignment.my_role,
-            book_name=assignment.book_name,
-            book_hint=assignment.book_hint,
-            association_domain=assignment.association_domain,
+            book_name="",  # Filled in by Q21ROUNDSTART
+            book_hint="",  # Filled in by Q21ROUNDSTART
+            association_word="",  # Filled in by Q21ROUNDSTART
             auth_token=self._auth_token,
         )
 

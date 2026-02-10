@@ -93,37 +93,33 @@ class GMController:
             result = self._executor.execute_warmup(payload)
             self._game_state["phase"] = "WARMUP_COMPLETE"
             return Q21Response(
-                message_type="Q21_WARMUP_RESPONSE",
+                message_type=Q21Handler.WARMUP_RESPONSE,
                 payload={"match_id": match_id, "answer": result["warmup_answer"]},
                 recipient=sender,
             )
 
         elif msg_type == Q21Handler.ROUND_START:
+            # Q21ROUNDSTART triggers immediate Q21QUESTIONSBATCH response
             result = self._executor.handle_round_start(payload)
             self._game_state.update(result)
-            self._game_state["phase"] = "ROUND_STARTED"
-            # Round start triggers questions
-            return self.handle_q21_message(Q21Handler.QUESTIONS_CALL, payload, sender)
-
-        elif msg_type == Q21Handler.QUESTIONS_CALL:
-            result = self._executor.execute_questions(payload)
-            self._game_state["questions"] = result["questions"]
+            questions_result = self._executor.execute_questions(payload)
+            self._game_state["questions"] = questions_result["questions"]
             self._game_state["phase"] = "QUESTIONS_SENT"
             return Q21Response(
-                message_type="Q21_QUESTIONS_BATCH",
-                payload={"match_id": match_id, "questions": result["questions"]},
+                message_type=Q21Handler.QUESTIONS_BATCH,
+                payload={"match_id": match_id, "questions": questions_result["questions"]},
                 recipient=sender,
             )
 
         elif msg_type == Q21Handler.ANSWERS_BATCH:
             result = self._executor.receive_answers(payload)
             self._game_state["answers"] = result["answers"]
-            # Auto-trigger guess after receiving answers
+            # Q21ANSWERSBATCH triggers immediate Q21GUESSSUBMISSION response
             guess_payload = {**payload, "answers": result["answers"]}
             guess_result = self._executor.execute_guess(guess_payload)
             self._game_state["phase"] = "GUESS_SUBMITTED"
             return Q21Response(
-                message_type="Q21_GUESS_SUBMISSION",
+                message_type=Q21Handler.GUESS_SUBMISSION,
                 payload={"match_id": match_id, "guess": guess_result["guess"]},
                 recipient=sender,
             )
@@ -132,7 +128,7 @@ class GMController:
             result = self._executor.handle_score(payload)
             self._game_state["phase"] = "COMPLETED"
             self._game_state["score"] = result
-            # Score feedback doesn't require a response
+            # Score feedback is terminal - no response required
             return None
 
         else:
