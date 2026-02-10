@@ -2,13 +2,13 @@
 """Gmail OAuth setup script for Q21 Player SDK.
 
 Initializes Gmail API credentials by:
-1. Copying your OAuth client secret (credentials.json) to the project
+1. Copying your OAuth client secret (client_secret.json) to the project
 2. Running the OAuth flow to generate a token
 3. Verifying the connection works
 
 Usage:
     python setup_gmail.py
-    python setup_gmail.py --credentials /path/to/downloaded/credentials.json
+    python setup_gmail.py --credentials /path/to/downloaded/client_secret_XXXXX.json
 """
 import argparse
 import json
@@ -132,11 +132,11 @@ def main() -> int:
     """Run the Gmail setup."""
     parser = argparse.ArgumentParser(description="Setup Gmail OAuth credentials")
     parser.add_argument("--credentials", "-c", type=str,
-                        help="Path to downloaded credentials.json from Google Cloud Console")
+                        help="Path to downloaded client_secret_XXXXX.json from Google Cloud Console")
     parser.add_argument("--token-path", "-t", type=str, default="token.json",
                         help="Where to save the OAuth token (default: token.json)")
-    parser.add_argument("--dest", "-d", type=str, default="credentials.json",
-                        help="Where to copy credentials in project (default: credentials.json)")
+    parser.add_argument("--dest", "-d", type=str, default="client_secret.json",
+                        help="Where to copy credentials in project (default: client_secret.json)")
     args = parser.parse_args()
 
     print_header("Gmail OAuth Setup for Q21 Player SDK")
@@ -163,8 +163,12 @@ def main() -> int:
        - Click "Create Credentials" > "OAuth client ID"
        - Choose "Desktop app" as application type
        - Download the JSON file
+
+  IMPORTANT: Enter the FULL path including the filename and .json extension!
+  Example (Windows): C:\\Users\\YourName\\Downloads\\client_secret_123456.json
+  Example (macOS):   /Users/YourName/Downloads/client_secret_123456.json
 """)
-        source_input = ask("Path to your downloaded credentials JSON file")
+        source_input = ask("Full path to your downloaded credentials JSON file")
         source_path = Path(source_input).expanduser()
 
     if not source_path.exists():

@@ -89,7 +89,7 @@ def setup_gmail() -> tuple[bool, str, str, str]:
     """Setup Gmail OAuth and return (success, email, creds_path, token_path)."""
     print_header("Step 1: Gmail OAuth")
 
-    credentials_path = Path("credentials.json")
+    credentials_path = Path("client_secret.json")
     token_path = Path("token.json")
 
     # Check if already set up
@@ -130,8 +130,12 @@ def setup_gmail() -> tuple[bool, str, str, str]:
     3. OAuth consent screen → Add yourself as test user
     4. Credentials → Create OAuth client ID (Desktop app)
     5. Download the JSON file
+
+  IMPORTANT: Enter the FULL path including the filename and .json extension!
+  Example (Windows): C:\\Users\\YourName\\Downloads\\client_secret_123456.json
+  Example (macOS):   /Users/YourName/Downloads/client_secret_123456.json
 """)
-        source_input = ask("Path to your downloaded credentials JSON")
+        source_input = ask("Full path to your downloaded credentials JSON file")
         source_path = Path(source_input).expanduser()
 
         if not source_path.exists():
@@ -334,7 +338,7 @@ def verify_setup() -> bool:
     # Check files
     checks = [
         ("js/config.json", "Configuration"),
-        ("credentials.json", "Gmail credentials"),
+        ("client_secret.json", "Gmail credentials"),
         ("token.json", "Gmail token"),
         ("my_player.py", "PlayerAI module"),
         (".env", "Environment file"),
@@ -407,7 +411,7 @@ def main() -> int:
     print("  Press Enter to accept default values shown in [brackets].")
 
     gmail_account = ""
-    creds_path = "credentials.json"
+    creds_path = "client_secret.json"
     token_path = "token.json"
     db_host, db_port, db_name, db_user, db_password = "localhost", "5432", "gtai_player", "postgres", ""
 

@@ -103,8 +103,8 @@ class SetupVerifier:
             self.errors.append("Missing js/config.json")
             results.append(False)
 
-        # credentials.json
-        creds_path = os.getenv("GMAIL_CREDENTIALS_PATH", "credentials.json")
+        # client_secret.json
+        creds_path = os.getenv("GMAIL_CREDENTIALS_PATH", "client_secret.json")
         if Path(creds_path).exists():
             ok(f"Gmail credentials: {creds_path}")
             results.append(True)
@@ -228,7 +228,7 @@ class SetupVerifier:
         header("4. Gmail API")
 
         token_path = Path(os.getenv("GMAIL_TOKEN_PATH", "token.json"))
-        creds_path = Path(os.getenv("GMAIL_CREDENTIALS_PATH", "credentials.json"))
+        creds_path = Path(os.getenv("GMAIL_CREDENTIALS_PATH", "client_secret.json"))
 
         if not creds_path.exists():
             fail(f"Credentials not found: {creds_path}")

@@ -194,7 +194,7 @@ q21-player-sdk/
 │   ├── config.template.json   # Configuration template
 │   └── config.json            # Your configuration (DO NOT COMMIT)
 ├── .env                       # Environment variables (DO NOT COMMIT)
-├── credentials.json           # Gmail OAuth credentials (DO NOT COMMIT)
+├── client_secret.json         # Gmail OAuth credentials (DO NOT COMMIT)
 ├── token.json                 # OAuth token (DO NOT COMMIT)
 └── docs/
     └── prd-rlgm.md            # RLGM architecture PRD
