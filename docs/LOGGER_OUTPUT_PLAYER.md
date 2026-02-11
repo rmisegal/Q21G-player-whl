@@ -1,6 +1,6 @@
 # Logger Output PRD - Player Perspective
 
-**Version:** 1.2
+**Version:** 1.3
 **Status:** CANONICAL REFERENCE
 **Last Updated:** 2026-02-11
 
@@ -37,7 +37,7 @@ HH:MM:SS | GAME-ID: SSRRGGG | SENT/RECEIVED | to/from {email} | MESSAGE-NAME | E
 | Field | Label | Format | Description |
 |-------|-------|--------|-------------|
 | F1 | *(none)* | `HH:MM:SS` | Time (Hour:Minute:Seconds) |
-| F2 | `GAME-ID:` | `SSRRGGG` | Game ID (SS=Season, RR=Round, GGG=Game). Query from DB if not in message. |
+| F2 | `GAME-ID:` | `SSRRGGG` | Game ID (SS=Season, RR=Round, GGG=Game). Normalized to 7-digit format. |
 | F3 | *(none)* | `SENT` or `RECEIVED` | Direction of email |
 | F4 | `to` or `from` | `{email address}` | Email address with direction prefix |
 | F5 | *(none)* | Message name | Simplified name from lookup table |
@@ -53,6 +53,18 @@ HH:MM:SS | GAME-ID: SSRRGGG | SENT/RECEIVED | to/from {email} | MESSAGE-NAME | E
 | `PLAYER-INACTIVE` | Player is NOT participating in the current game/round |
 
 **Rule:** Q21 messages (game-level) always imply `PLAYER-ACTIVE`. The referee only sends Q21 messages to participating players. The `PLAYER-INACTIVE` status only applies to round-level `START-ROUND` messages when the player has no assignments for that round.
+
+### 3.4 Game ID Normalization (F2)
+
+The game_id must always be displayed in 7-digit `SSRRGGG` format. Non-standard formats are normalized:
+
+| Input Format | Output | Example |
+|--------------|--------|---------|
+| Standard 7-digit | Pass through | `0102001` → `0102001` |
+| Training format | Extract trailing 7 digits | `TRAIN_2026-02-11_0900_0102001` → `0102001` |
+| Other with trailing digits | Extract trailing 7 digits | `PREFIX_0103002` → `0103002` |
+
+**Implementation:** The `_normalize_game_id()` function in `log_context.py` handles this extraction.
 
 ---
 
