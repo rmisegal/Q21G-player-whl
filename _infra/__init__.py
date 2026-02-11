@@ -13,6 +13,7 @@ Components:
     GameResult - result of game execution
     DemoAI - demo PlayerAI for testing without LLM
 """
+from _infra._license import __license__, __copyright__
 from _infra.router import MessageRouter, RoutingResult
 from _infra.demo_ai import DemoAI
 from _infra.rlgm import (
@@ -32,6 +33,9 @@ from _infra.gmc import (
 )
 
 __all__ = [
+    # License
+    "__license__",
+    "__copyright__",
     # Main router
     "MessageRouter",
     "RoutingResult",

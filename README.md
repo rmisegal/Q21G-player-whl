@@ -329,3 +329,7 @@ python verify_setup.py
 ```
 
 This will identify exactly what's missing or misconfigured.
+
+## License
+
+This project is proprietary software. No code modifications are permitted, and usage is restricted exclusively to students enrolled in Dr. Yoram Segal's courses. Any other use requires prior written permission. See [LICENSE](LICENSE) for full terms.
