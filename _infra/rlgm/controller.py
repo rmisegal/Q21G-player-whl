@@ -8,9 +8,6 @@ from _infra.gmc.game_executor import PlayerAIProtocol
 from _infra.rlgm.gprm import GPRM, GPRMBuilder
 from _infra.rlgm.league_handler import LeagueHandler, LeagueResponse
 from _infra.rlgm.round_manager import RoundManager
-from _infra.shared.logging.protocol_logger import (
-    set_season_context, set_round_context, set_game_context
-)
 
 
 class RLGMController:
@@ -65,18 +62,15 @@ class RLGMController:
 
         # Route to appropriate handler based on message type
         if msg_type == LeagueHandler.START_SEASON:
-            set_season_context()  # SS99999, empty role
             response = self._league_handler.handle_start_season(payload, sender)
             season_id = payload.get("season_id", "")
             self._round_manager.set_season(season_id)
             self._gprm_builder.set_season_id(season_id)
 
         elif msg_type == LeagueHandler.REGISTRATION_RESPONSE:
-            set_season_context()  # SS99999, empty role
             self._league_handler.handle_registration_response(payload)
 
         elif msg_type == LeagueHandler.ASSIGNMENT_TABLE:
-            set_season_context()  # SS99999, empty role
             response = self._league_handler.handle_assignment_table(payload, sender)
             raw_assignments = payload.get("assignments", [])
             enriched = self._league_handler.parse_assignments_for_player(raw_assignments)
@@ -90,14 +84,10 @@ class RLGMController:
 
         elif msg_type == LeagueHandler.NEW_ROUND:
             round_number = payload.get("round_number", 1)
-            # Check if player has assignments for this round
-            has_assignments = len(self._round_assignments.get(round_number, [])) > 0
-            set_round_context(round_number, player_active=has_assignments)  # SSRR999
             self._round_manager.set_current_round(round_number)
             games_to_run = self._round_manager.get_games_for_round(round_number)
 
         elif msg_type == LeagueHandler.LEAGUE_COMPLETED:
-            set_season_context()  # SS99999, empty role
             self._league_handler.handle_league_completed(payload)
 
         else:
@@ -123,10 +113,6 @@ class RLGMController:
         Returns:
             Response dict or None if no response needed.
         """
-        # Set logging context with game_id from payload (match_id == game_id)
-        game_id = payload.get("match_id", "0000000")
-        set_game_context(game_id, player_active=True)
-
         q21_response = self._gmc.handle_q21_message(msg_type, payload, sender)
         if q21_response is None:
             return None

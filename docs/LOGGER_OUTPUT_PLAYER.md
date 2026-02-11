@@ -1,8 +1,8 @@
 # Logger Output PRD - Player Perspective
 
-**Version:** 1.1
+**Version:** 1.2
 **Status:** CANONICAL REFERENCE
-**Last Updated:** 2026-02-10
+**Last Updated:** 2026-02-11
 
 ---
 
@@ -51,6 +51,8 @@ HH:MM:SS | GAME-ID: SSRRGGG | SENT/RECEIVED | to/from {email} | MESSAGE-NAME | E
 |--------|-----------|
 | `PLAYER-ACTIVE` | Player is participating in the current game/round |
 | `PLAYER-INACTIVE` | Player is NOT participating in the current game/round |
+
+**Rule:** Q21 messages (game-level) always imply `PLAYER-ACTIVE`. The referee only sends Q21 messages to participating players. The `PLAYER-INACTIVE` status only applies to round-level `START-ROUND` messages when the player has no assignments for that round.
 
 ---
 
