@@ -1,6 +1,6 @@
 # CLAUDE.md
 **IMPORTANT: Read this entire file before making ANY code changes.**
-Version: 1.0.0
+Version: 1.1.0
 
 ## Development Principles
 
@@ -33,25 +33,59 @@ Version: 1.0.0
 |---------|-----|---------|
 | RLGM (League Manager Interface) | `docs/prd-rlgm.md` | `_infra/rlgm/` |
 | GMC (Game Manager Component) | `docs/prd-rlgm.md` | `_infra/gmc/` |
-| Player API | `docs/prd-player-api.md` | `api/` |
-| Configuration | `docs/prd-configuration.md` | `_infra/shared/config/` |
-| State Management | `docs/prd-state-management.md` | `_infra/repository/` |
+| Protocol Logging | `docs/LOGGER_OUTPUT_PLAYER.md` | `_infra/shared/logging/` |
 
 ## Project Structure
 
 ```
-q21-player-sdk/
+Q21G-player-whl/
 ├── CLAUDE.md                    # This file - development guidelines
 ├── README.md                    # Quick start guide
 ├── CONFIG_GUIDE.md              # Configuration documentation
-├── docs/
-│   ├── prd-rlgm.md             # RLGM architecture PRD
-│   └── comparison-*.md          # Implementation comparisons
-├── js/
-│   └── config.json              # Configuration file
+├── STARTUP_CONTEXT_V01.md       # Project overview context
+├── .env.example                 # Environment variables template
+│
 ├── my_player.py                 # Student implementation (PUBLIC)
+├── run.py                       # CLI entry point
+├── setup.py                     # Unified setup wizard
+├── setup_gmail.py               # Gmail OAuth setup
+├── setup_config.py              # Configuration generator
+├── init_db.py                   # Database schema initialization
+├── verify_setup.py              # Setup verification script
+│
+├── _infra/                      # Hidden infrastructure
+│   ├── __init__.py              # Package exports
+│   ├── router.py                # MessageRouter - unified entry point
+│   ├── demo_ai.py               # DemoAI for testing
+│   │
+│   ├── rlgm/                    # League-level components
+│   │   ├── __init__.py
+│   │   ├── controller.py        # RLGMController
+│   │   ├── league_handler.py    # BROADCAST_* handlers
+│   │   ├── round_manager.py     # Assignment tracking
+│   │   └── gprm.py              # GPRM & GameResult dataclasses
+│   │
+│   ├── gmc/                     # Game-level components
+│   │   ├── __init__.py
+│   │   ├── controller.py        # GMController
+│   │   ├── q21_handler.py       # Q21* message routing
+│   │   └── game_executor.py     # PlayerAI callback execution
+│   │
+│   └── shared/
+│       └── logging/
+│           └── protocol_logger.py  # Colored protocol logging
+│
+├── docs/
+│   ├── prd-rlgm.md              # RLGM/GMC architecture PRD
+│   ├── LOGGER_OUTPUT_PLAYER.md  # Logger output specification
+│   ├── LOGGER_IMPLEMENTATION_TASKS.md
+│   └── comparison-gmailasplayer-vs-rlgm.md
+│
+├── js/
+│   └── config.template.json     # Configuration template
+│
 └── dist/
-    └── q21_player-*.whl         # SDK package (hidden infrastructure)
+    └── q21_player-*.whl         # SDK package
 ```
 
 ## Terminology
@@ -60,5 +94,6 @@ q21-player-sdk/
 |------|-----------|-------------|
 | **GMC** | Game Manager Component | Handles a single Q21 game cycle with the referee |
 | **RLGM** | Referee-League Game Manager | Interfaces between League Manager and GMC |
-| **GPRM** | Game Parameters | Input data needed to run a single game |
+| **GPRM** | Game Parameters | Input data needed to run a single game (7-digit SSRRGGG format) |
 | **PlayerAI** | Player AI Interface | The 4 callbacks students implement |
+| **game_id** | Game Identifier | 7-digit format: SS (season) + RR (round) + GGG (game number) |

@@ -1,8 +1,6 @@
-"""RLGM Controller - League communication orchestrator.
-
-Manages all league-level communication with the League Manager
-and delegates individual game execution to GMC.
-"""
+# Area: RLGM (League Manager Interface)
+# PRD: docs/prd-rlgm.md
+"""RLGM Controller - League communication orchestrator."""
 from typing import Any, Optional, Tuple, List
 
 from _infra.gmc.controller import GMController
@@ -10,18 +8,11 @@ from _infra.gmc.game_executor import PlayerAIProtocol
 from _infra.rlgm.gprm import GPRM, GPRMBuilder
 from _infra.rlgm.league_handler import LeagueHandler, LeagueResponse
 from _infra.rlgm.round_manager import RoundManager
+from _infra.shared.logging.protocol_logger import set_game_context
 
 
 class RLGMController:
-    """Orchestrates league-level communication.
-
-    Handles League Manager broadcasts and coordinates with GMC
-    for individual game execution.
-
-    Message routing:
-    - BROADCAST_* messages -> LeagueHandler -> LeagueResponse
-    - Q21_* messages -> GMController -> Q21Response
-    """
+    """Orchestrates league-level communication with League Manager and GMC."""
 
     def __init__(
         self,
@@ -96,9 +87,7 @@ class RLGMController:
                 self._round_manager.set_assignments(round_num, assignments)
 
         elif msg_type == LeagueHandler.NEW_ROUND:
-            # NEW_ROUND is a transition message - it just signals the round is starting.
-            # Assignments should already be stored from BROADCAST_ASSIGNMENT_TABLE.
-            # We retrieve them from RoundManager (which may query a database).
+            # Retrieve pre-stored assignments and trigger games
             round_number = payload.get("round_number", 1)
             self._round_manager.set_current_round(round_number)
             games_to_run = self._round_manager.get_games_for_round(round_number)
@@ -129,6 +118,10 @@ class RLGMController:
         Returns:
             Response dict or None if no response needed.
         """
+        # Set logging context with game_id from payload (match_id == game_id)
+        game_id = payload.get("match_id", "0000000")
+        set_game_context(game_id, player_active=True)
+
         q21_response = self._gmc.handle_q21_message(msg_type, payload, sender)
         if q21_response is None:
             return None

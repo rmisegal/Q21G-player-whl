@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 1.0.0
+Version: 1.1.0
 
 ## Document Info
 - **Area**: League Management
@@ -294,6 +294,27 @@ def handle_league_completed(self, payload: dict) -> None:
     self._standings_repo.save_final_standings(season_id, final_standings)
     self._state_repo.update_state_only(self._player_email, PlayerState.SEASON_COMPLETE)
 ```
+
+### Gap #3: Logging Context Not Set for Game ID (Fixed in v1.1.0)
+
+**Problem**: The `ProtocolLogger.set_game_context()` method existed but was never called,
+causing all log messages to show the default game_id `0000000` instead of the actual game_id.
+
+**Fix**: In `_infra/rlgm/controller.py`, added `set_game_context()` call in `process_q21_message()`:
+
+```python
+from _infra.shared.logging.protocol_logger import set_game_context
+
+def process_q21_message(self, msg_type: str, payload: dict, sender: str) -> Optional[dict]:
+    # Set logging context with game_id from payload (match_id == game_id)
+    game_id = payload.get("match_id", "0000000")
+    set_game_context(game_id, player_active=True)
+
+    q21_response = self._gmc.handle_q21_message(msg_type, payload, sender)
+    # ...
+```
+
+Now all Q21 message logs correctly display the 7-digit SSRRGGG game_id.
 
 ---
 
