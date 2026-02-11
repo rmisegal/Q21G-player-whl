@@ -78,13 +78,23 @@ class ProtocolLogger:
     """Logger for protocol messages with colored output."""
 
     _current_game_id: str = "0000000"
+    _last_ssrr: str = "0000"  # Last known season+round (SSRR)
     _player_active: bool = True
 
     @classmethod
     def set_game_context(cls, game_id: str, player_active: bool = True) -> None:
-        """Set current game context for logging."""
+        """Set current game context for logging. Stores SSRR for round-level fallback."""
         cls._current_game_id = game_id or "0000000"
         cls._player_active = player_active
+        # Store SSRR from valid game_ids (not ending in 999)
+        if len(game_id) >= 4 and not game_id.endswith("999"):
+            cls._last_ssrr = game_id[:4]
+
+    @classmethod
+    def set_round_context(cls) -> None:
+        """Set context for round-level messages (no specific game). Uses SSRR999."""
+        cls._current_game_id = cls._last_ssrr + "999"
+        cls._player_active = True  # Will be ignored due to 999
 
     @classmethod
     def _get_display_name(cls, msg_type: str) -> str:
@@ -113,7 +123,9 @@ class ProtocolLogger:
 
     @classmethod
     def _get_role(cls) -> str:
-        """Get current role status."""
+        """Get current role status. Empty for round-level (999) game_ids."""
+        if cls._current_game_id.endswith("999"):
+            return ""
         return "PLAYER-ACTIVE" if cls._player_active else "PLAYER-INACTIVE"
 
     @classmethod
@@ -254,3 +266,7 @@ def log_callback_response(callback_name: str) -> None:
 
 def set_game_context(game_id: str, player_active: bool = True) -> None:
     ProtocolLogger.set_game_context(game_id, player_active)
+
+
+def set_round_context() -> None:
+    ProtocolLogger.set_round_context()

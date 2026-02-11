@@ -8,7 +8,7 @@ from _infra.gmc.game_executor import PlayerAIProtocol
 from _infra.rlgm.gprm import GPRM, GPRMBuilder
 from _infra.rlgm.league_handler import LeagueHandler, LeagueResponse
 from _infra.rlgm.round_manager import RoundManager
-from _infra.shared.logging.protocol_logger import set_game_context
+from _infra.shared.logging.protocol_logger import set_game_context, set_round_context
 
 
 class RLGMController:
@@ -58,6 +58,9 @@ class RLGMController:
         Returns:
             Tuple of (LeagueResponse or None, list of GPRM for games to run).
         """
+        # Set logging context for league messages (SSRR999 format, no role)
+        set_round_context()
+
         games_to_run: List[GPRM] = []
         response: Optional[LeagueResponse] = None
 

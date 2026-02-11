@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 1.1.0
+Version: 1.2.0
 
 ## Document Info
 - **Area**: League Management
@@ -315,6 +315,33 @@ def process_q21_message(self, msg_type: str, payload: dict, sender: str) -> Opti
 ```
 
 Now all Q21 message logs correctly display the 7-digit SSRRGGG game_id.
+
+### Gap #4: League Messages Show Default game_id 0000000 (Fixed in v1.2.0)
+
+**Problem**: League messages (BROADCAST_NEW_LEAGUE_ROUND, etc.) showed `0000000` as game_id
+because they don't contain a specific game_id - they're round-level messages.
+
+**Fix**: Added round-level context using SSRR999 format:
+
+1. `ProtocolLogger` now tracks last known SSRR from game_ids
+2. Added `set_round_context()` method that sets game_id to `SSRR999`
+3. When game_id ends with `999`, ROLE field is empty (not ACTIVE/INACTIVE)
+
+```python
+# In protocol_logger.py
+_last_ssrr: str = "0000"  # Tracks last season+round
+
+@classmethod
+def set_round_context(cls) -> None:
+    """Set context for round-level messages. Uses SSRR999."""
+    cls._current_game_id = cls._last_ssrr + "999"
+
+# In controller.py process_message()
+set_round_context()  # Called before processing league messages
+```
+
+**Result**: League messages now show `SSRR999` (e.g., `0102999` for season 01, round 02)
+with empty ROLE field, distinguishing them from game-specific messages.
 
 ---
 
