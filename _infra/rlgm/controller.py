@@ -8,7 +8,9 @@ from _infra.gmc.game_executor import PlayerAIProtocol
 from _infra.rlgm.gprm import GPRM, GPRMBuilder
 from _infra.rlgm.league_handler import LeagueHandler, LeagueResponse
 from _infra.rlgm.round_manager import RoundManager
-from _infra.shared.logging.protocol_logger import set_game_context, set_round_context
+from _infra.shared.logging.protocol_logger import (
+    set_season_context, set_round_context, set_game_context
+)
 
 
 class RLGMController:
@@ -58,44 +60,44 @@ class RLGMController:
         Returns:
             Tuple of (LeagueResponse or None, list of GPRM for games to run).
         """
-        # Set logging context for league messages (SSRR999 format, no role)
-        set_round_context()
-
         games_to_run: List[GPRM] = []
         response: Optional[LeagueResponse] = None
 
         # Route to appropriate handler based on message type
         if msg_type == LeagueHandler.START_SEASON:
+            set_season_context()  # SS99999, empty role
             response = self._league_handler.handle_start_season(payload, sender)
             season_id = payload.get("season_id", "")
             self._round_manager.set_season(season_id)
             self._gprm_builder.set_season_id(season_id)
 
         elif msg_type == LeagueHandler.REGISTRATION_RESPONSE:
+            set_season_context()  # SS99999, empty role
             self._league_handler.handle_registration_response(payload)
 
         elif msg_type == LeagueHandler.ASSIGNMENT_TABLE:
+            set_season_context()  # SS99999, empty role
             response = self._league_handler.handle_assignment_table(payload, sender)
-            # Parse and store all assignments for the season (grouped by round)
             raw_assignments = payload.get("assignments", [])
             enriched = self._league_handler.parse_assignments_for_player(raw_assignments)
-            # Group by round_number and store
             for assignment in enriched:
                 round_number = assignment.get("round_number", 1)
                 if round_number not in self._round_assignments:
                     self._round_assignments[round_number] = []
                 self._round_assignments[round_number].append(assignment)
-            # Store in round manager
             for round_num, assignments in self._round_assignments.items():
                 self._round_manager.set_assignments(round_num, assignments)
 
         elif msg_type == LeagueHandler.NEW_ROUND:
-            # Retrieve pre-stored assignments and trigger games
             round_number = payload.get("round_number", 1)
+            # Check if player has assignments for this round
+            has_assignments = len(self._round_assignments.get(round_number, [])) > 0
+            set_round_context(round_number, player_active=has_assignments)  # SSRR999
             self._round_manager.set_current_round(round_number)
             games_to_run = self._round_manager.get_games_for_round(round_number)
 
         elif msg_type == LeagueHandler.LEAGUE_COMPLETED:
+            set_season_context()  # SS99999, empty role
             self._league_handler.handle_league_completed(payload)
 
         else:

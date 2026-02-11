@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 1.2.0
+Version: 1.3.0
 
 ## Document Info
 - **Area**: League Management
@@ -316,32 +316,47 @@ def process_q21_message(self, msg_type: str, payload: dict, sender: str) -> Opti
 
 Now all Q21 message logs correctly display the 7-digit SSRRGGG game_id.
 
-### Gap #4: League Messages Show Default game_id 0000000 (Fixed in v1.2.0)
+### Gap #4: Correct game_id Format Per Message Type (Fixed in v1.3.0)
 
-**Problem**: League messages (BROADCAST_NEW_LEAGUE_ROUND, etc.) showed `0000000` as game_id
-because they don't contain a specific game_id - they're round-level messages.
+**Problem**: Different message types require different game_id formats and role visibility.
 
-**Fix**: Added round-level context using SSRR999 format:
+**Solution**: Three context levels with specific formats:
 
-1. `ProtocolLogger` now tracks last known SSRR from game_ids
-2. Added `set_round_context()` method that sets game_id to `SSRR999`
-3. When game_id ends with `999`, ROLE field is empty (not ACTIVE/INACTIVE)
+| Context | game_id Format | Role | Messages |
+|---------|---------------|------|----------|
+| Season | SS99999 | empty | START-SEASON, SIGNUP-RESPONSE, ASSIGNMENT-TABLE, SEASON-ENDED |
+| Round | SSRR999 | ACTIVE/INACTIVE | START-ROUND |
+| Game | SSRRGGG | ACTIVE/INACTIVE | All Q21 messages |
+
+**Implementation**:
+
+1. Split `protocol_logger.py` into `constants.py` + `protocol_logger.py` (under 150 lines each)
+2. Added three context methods:
 
 ```python
 # In protocol_logger.py
-_last_ssrr: str = "0000"  # Tracks last season+round
-
-@classmethod
-def set_round_context(cls) -> None:
-    """Set context for round-level messages. Uses SSRR999."""
-    cls._current_game_id = cls._last_ssrr + "999"
-
-# In controller.py process_message()
-set_round_context()  # Called before processing league messages
+def set_season_context()  # SS99999, empty role
+def set_round_context(round_number, player_active)  # SSRR999, with role
+def set_game_context(game_id, player_active)  # SSRRGGG, with role
 ```
 
-**Result**: League messages now show `SSRR999` (e.g., `0102999` for season 01, round 02)
-with empty ROLE field, distinguishing them from game-specific messages.
+3. Controller sets context per message type:
+
+```python
+# Season-level messages
+if msg_type in (START_SEASON, REGISTRATION_RESPONSE, ASSIGNMENT_TABLE, LEAGUE_COMPLETED):
+    set_season_context()
+
+# Round-level messages
+elif msg_type == NEW_ROUND:
+    has_assignments = len(self._round_assignments.get(round_number, [])) > 0
+    set_round_context(round_number, player_active=has_assignments)
+
+# Game-level messages (Q21*)
+set_game_context(game_id, player_active=True)
+```
+
+**Result**: Each message type displays the correct game_id format and role visibility.
 
 ---
 
