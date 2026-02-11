@@ -9,8 +9,8 @@ SDK for implementing a Q21 (21-Questions) game player that communicates with the
 #### macOS / Linux
 
 ```bash
-git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
-cd q21-player-sdk
+git clone https://github.com/rmisegal/Q21G-player-whl.git
+cd Q21G-player-whl
 python3 -m venv .venv
 source .venv/bin/activate
 pip install dist/q21_player-1.0.1-py3-none-any.whl
@@ -19,8 +19,8 @@ pip install dist/q21_player-1.0.1-py3-none-any.whl
 #### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/OmryTzabbar1/q21-player-sdk.git
-cd q21-player-sdk
+git clone https://github.com/rmisegal/Q21G-player-whl.git
+cd Q21G-player-whl
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install dist/q21_player-1.0.1-py3-none-any.whl
@@ -177,7 +177,7 @@ The SDK uses a layered architecture for handling protocol messages:
 ## Project Structure
 
 ```
-q21-player-sdk/
+Q21G-player-whl/
 ├── setup.py                   # Unified setup wizard (start here!)
 ├── init_db.py                 # Database schema initialization
 ├── setup_gmail.py             # Gmail OAuth setup (standalone)
