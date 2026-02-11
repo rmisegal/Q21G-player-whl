@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 1.3.0
+Version: 1.4.0
 
 ## Document Info
 - **Area**: League Management
@@ -331,7 +331,8 @@ Now all Q21 message logs correctly display the 7-digit SSRRGGG game_id.
 **Implementation**:
 
 1. Split `protocol_logger.py` into `constants.py` + `protocol_logger.py` (under 150 lines each)
-2. Added three context methods:
+2. Created `cli/log_context.py` for context-setting logic (43 lines)
+3. Added three context methods:
 
 ```python
 # In protocol_logger.py
@@ -340,20 +341,13 @@ def set_round_context(round_number, player_active)  # SSRR999, with role
 def set_game_context(game_id, player_active)  # SSRRGGG, with role
 ```
 
-3. Controller sets context per message type:
+4. `scan_handler.py` uses `set_logging_context()` from `cli/log_context.py`:
 
 ```python
-# Season-level messages
-if msg_type in (START_SEASON, REGISTRATION_RESPONSE, ASSIGNMENT_TABLE, LEAGUE_COMPLETED):
-    set_season_context()
+from q21_player._infra.cli.log_context import set_logging_context
 
-# Round-level messages
-elif msg_type == NEW_ROUND:
-    has_assignments = len(self._round_assignments.get(round_number, [])) > 0
-    set_round_context(round_number, player_active=has_assignments)
-
-# Game-level messages (Q21*)
-set_game_context(game_id, player_active=True)
+# In message processing loop
+set_logging_context(normalized_type, game_id, inner, payload, assignment_repo, gatekeeper.current_season_id)
 ```
 
 **Result**: Each message type displays the correct game_id format and role visibility.
