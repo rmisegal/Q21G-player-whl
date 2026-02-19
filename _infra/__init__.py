@@ -21,9 +21,11 @@ from _infra.rlgm import (
     GameResult,
     GPRMBuilder,
     RLGMController,
+    RoundLifecycleManager,
     LeagueHandler,
     LeagueResponse,
-    RoundManager,
+    GamePhase,
+    TerminationReport,
 )
 from _infra.gmc import (
     GMController,
@@ -45,7 +47,9 @@ __all__ = [
     "RLGMController",
     "LeagueHandler",
     "LeagueResponse",
-    "RoundManager",
+    "RoundLifecycleManager",
+    "GamePhase",
+    "TerminationReport",
     "GPRM",
     "GameResult",
     "GPRMBuilder",
