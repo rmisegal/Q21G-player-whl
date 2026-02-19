@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 1.4.0
+Version: 2.0.0
 
 ## Document Info
 - **Area**: League Management
@@ -53,7 +53,7 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 │  │          │           │         │          │           │             │
 │  │  ┌───────▼────────┐  │ Result  │  ┌───────▼────────┐  │             │
 │  │  │ LeagueHandler  │  │<────────│  │ GameExecutor   │  │             │
-│  │  │ RoundManager   │  │         │  │ Q21Handler     │  │             │
+│  │  │ Lifecycle Mgr  │  │         │  │ Q21Handler     │  │             │
 │  │  │ GPRMBuilder    │  │         │  └────────────────┘  │             │
 │  │  └────────────────┘  │         │                      │             │
 │  └──────────┬───────────┘         └──────────┬───────────┘             │
@@ -79,21 +79,22 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 
 ```
 _infra/
-├── rlgm/                              # RLGM Package (~450 lines total)
-│   ├── __init__.py                    # ~20 lines - exports
-│   ├── controller.py                  # ~120 lines - Main orchestrator
-│   ├── league_handler.py              # ~100 lines - League broadcasts
-│   ├── round_manager.py               # ~80 lines - Round lifecycle
-│   ├── gprm.py                        # ~50 lines - GPRM dataclass
-│   └── game_scheduler.py              # ~80 lines - Game scheduling
+├── router.py                          # MessageRouter - unified entry point
+├── rlgm/                              # RLGM Package
+│   ├── __init__.py                    # Package exports
+│   ├── controller.py                  # ~97 lines - RLGMController orchestrator
+│   ├── league_handler.py              # ~228 lines - League broadcasts
+│   ├── round_lifecycle.py             # ~143 lines - RoundLifecycleManager (NEW)
+│   ├── termination.py                 # ~63 lines - GamePhase, TerminationReport (NEW)
+│   └── gprm.py                        # ~111 lines - GPRM, GameResult, GPRMBuilder
 │
-├── gmc/                               # GMC Package (~385 lines total)
-│   ├── __init__.py                    # ~15 lines - exports
-│   ├── controller.py                  # ~100 lines - Game lifecycle
-│   ├── q21_handler.py                 # ~90 lines - Q21 dispatch
-│   └── game_executor.py               # ~80 lines - Phase execution
+├── gmc/                               # GMC Package
+│   ├── __init__.py                    # Package exports
+│   ├── controller.py                  # ~139 lines - GMController with phase tracking
+│   ├── q21_handler.py                 # ~125 lines - Q21 message types + dispatch
+│   └── game_executor.py               # ~256 lines - PlayerAI callback execution
 │
-└── (existing files remain)
+└── shared/logging/                    # Protocol logging
 ```
 
 ---
@@ -143,9 +144,50 @@ class GameResult:
 
 ---
 
-## 6. Message Flow
+## 6. Round Lifecycle Management (v2.0.0)
 
-### 6.1 RLGM <-> League Manager
+### 6.1 RoundLifecycleManager
+
+Sits between RLGMController and GMController. Owns the current round, all its games, and provides atomic round transitions.
+
+```
+RLGMController
+    ├── LeagueHandler           (league broadcasts)
+    └── RoundLifecycleManager   (round + game ownership)
+            ├── GMController [game 0101001]   ← one per game
+            ├── GMController [game 0101002]
+            └── GMController [game 0101003]
+```
+
+**Key Methods:**
+- `start_round(N)` — Stops current round (if any), creates fresh GMControllers per assignment, returns GPRMs + termination reports
+- `stop_current_round(reason)` — Force-stops all incomplete games, returns TerminationReports
+- `route_q21_message(type, payload, sender)` — Routes Q21 messages to correct GMController by match_id
+
+### 6.2 GamePhase and TerminationReport
+
+```
+GamePhase: INITIALIZED → WARMUP_COMPLETE → QUESTIONS_SENT → GUESS_SUBMITTED → COMPLETED
+                                                                                 ↓
+                                                                            TERMINATED
+```
+
+When a round transition force-stops an incomplete game, a `TerminationReport` captures the game state snapshot and converts to a `MATCH_RESULT_REPORT` protocol message sent to the LGM.
+
+### 6.3 GMController Phase Tracking
+
+Each GMController tracks:
+- `phase` — Current GamePhase
+- `last_sent` / `last_received` — Message history for termination reporting
+- `initialize()` — Set up for a specific game
+- `terminate()` — Mark as TERMINATED
+- `get_termination_report(reason)` — Snapshot state
+
+---
+
+## 7. Message Flow
+
+### 7.1 RLGM <-> League Manager
 
 | Direction | Message | Handler | Response |
 |-----------|---------|---------|----------|
@@ -160,7 +202,7 @@ class GameResult:
 | LM -> RLGM | `BROADCAST_CRITICAL_RESET` | `league_handler.handle_critical_reset()` | `CRITICAL_RESET_RESPONSE` |
 | LM -> RLGM | `LEAGUE_COMPLETED` | `league_handler.handle_league_completed()` | None |
 
-### 6.2 GMC <-> Referee
+### 7.2 GMC <-> Referee
 
 | Direction | Message | Handler | Callback |
 |-----------|---------|---------|----------|
@@ -173,7 +215,7 @@ class GameResult:
 | GMC -> REF | `Q21_GUESS_SUBMISSION` | | |
 | REF -> GMC | `Q21_SCORE_FEEDBACK` | `game_executor.handle_score()` | `on_score_received()` |
 
-### 6.3 Score Tracking
+### 7.3 Score Tracking
 
 The player tracks scores internally for:
 - Knowing league standing
@@ -193,9 +235,9 @@ class PlayerStandings:
 
 ---
 
-## 7. Code Isolation Plan
+## 8. Code Isolation Plan
 
-### 7.1 Files to REUSE (wrap in RLGM)
+### 8.1 Files to REUSE (wrap in RLGM)
 
 | File | Used By |
 |------|---------|
@@ -206,7 +248,7 @@ class PlayerStandings:
 | `standings_handler.py` | `league_handler.py` calls this |
 | `player_gatekeeper.py` | RLGM uses for validation |
 
-### 7.2 Files to REFACTOR into GMC
+### 8.2 Files to REFACTOR into GMC
 
 | Current File | New Location |
 |-------------|--------------|
@@ -217,14 +259,15 @@ class PlayerStandings:
 | `answers_handler.py` | Used by `gmc/game_executor.py` |
 | `score_feedback_handler.py` | Used by `gmc/game_executor.py` |
 
-### 7.3 NEW Files to Create
+### 8.3 NEW Files to Create
 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `_infra/rlgm/__init__.py` | ~20 | Package exports |
 | `_infra/rlgm/controller.py` | ~120 | Main RLGM orchestrator |
 | `_infra/rlgm/league_handler.py` | ~100 | Wraps broadcast handlers |
-| `_infra/rlgm/round_manager.py` | ~80 | Round state management |
+| `_infra/rlgm/round_lifecycle.py` | ~143 | Round lifecycle management |
+| `_infra/rlgm/termination.py` | ~63 | GamePhase enum, TerminationReport |
 | `_infra/rlgm/gprm.py` | ~50 | GPRM dataclass + builder |
 | `_infra/rlgm/game_scheduler.py` | ~80 | Game scheduling logic |
 | `_infra/gmc/__init__.py` | ~15 | Package exports |
@@ -233,7 +276,7 @@ class PlayerStandings:
 
 ---
 
-## 8. Implementation Phases
+## 9. Implementation Phases
 
 ### Phase 0: Documentation
 1. Create `CLAUDE.md` with development guidelines
@@ -264,7 +307,7 @@ class PlayerStandings:
 
 ---
 
-## 9. Gap Fixes
+## 10. Gap Fixes
 
 ### Gap #1: on_score_received() Not Called
 
@@ -354,7 +397,7 @@ set_logging_context(normalized_type, game_id, inner, payload, assignment_repo, g
 
 ---
 
-## 10. Success Criteria
+## 11. Success Criteria
 
 1. All League Manager broadcasts handled by RLGM
 2. All Q21 messages handled by GMC
