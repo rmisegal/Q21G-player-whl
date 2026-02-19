@@ -73,7 +73,3 @@ class MatchReport:
         if self.breakdown is not None:
             msg["breakdown"] = self.breakdown
         return msg
-
-
-# Backward-compatible alias (will be removed in a future task)
-TerminationReport = MatchReport

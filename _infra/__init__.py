@@ -25,7 +25,7 @@ from _infra.rlgm import (
     LeagueHandler,
     LeagueResponse,
     GamePhase,
-    TerminationReport,
+    MatchReport,
 )
 from _infra.gmc import (
     GMController,
@@ -49,7 +49,7 @@ __all__ = [
     "LeagueResponse",
     "RoundLifecycleManager",
     "GamePhase",
-    "TerminationReport",
+    "MatchReport",
     "GPRM",
     "GameResult",
     "GPRMBuilder",
