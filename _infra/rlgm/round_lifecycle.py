@@ -13,7 +13,7 @@ from _infra.gmc.controller import GMController
 from _infra.gmc.game_executor import PlayerAIProtocol
 from _infra.gmc.q21_handler import Q21Response
 from _infra.rlgm.gprm import GPRM
-from _infra.rlgm.termination import GamePhase, TerminationReport
+from _infra.rlgm.termination import GamePhase, MatchReport
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +51,11 @@ class RoundLifecycleManager:
 
     def start_round(
         self, round_number: int
-    ) -> Tuple[List[GPRM], List[TerminationReport]]:
+    ) -> Tuple[List[GPRM], List[MatchReport]]:
         """Stop current round (if any), create new game controllers.
 
         Returns:
-            Tuple of (GPRMs for new games, TerminationReports from stopped).
+            Tuple of (GPRMs for new games, MatchReports from stopped).
         """
         reports = self.stop_current_round("NEW_ROUND_STARTED")
         self._current_round = round_number
@@ -78,19 +78,19 @@ class RoundLifecycleManager:
 
     def stop_current_round(
         self, reason: str = "NEW_ROUND_STARTED"
-    ) -> List[TerminationReport]:
+    ) -> List[MatchReport]:
         """Force-stop all active games, return reports for incomplete."""
-        reports = []
+        reports: List[MatchReport] = []
         for match_id, gmc in self._active_games.items():
             if gmc.phase not in (GamePhase.COMPLETED, GamePhase.TERMINATED):
-                reports.append(gmc.get_termination_report(reason))
+                reports.append(gmc.get_match_report(reason))
                 gmc.terminate()
         self._active_games.clear()
         return reports
 
     def route_q21_message(
         self, msg_type: str, payload: Dict[str, Any], sender: str
-    ) -> Optional[dict]:
+    ) -> Tuple[Optional[dict], List[MatchReport]]:
         """Route Q21 message to correct GMController by match_id."""
         match_id = payload.get("match_id", "")
         gmc = self._active_games.get(match_id)
@@ -98,15 +98,19 @@ class RoundLifecycleManager:
             logger.warning(
                 "Q21 message for unknown match_id %s - stale?", match_id
             )
-            return None
+            return None, []
         response = gmc.handle_q21_message(msg_type, payload, sender)
-        if response is None:
-            return None
-        return {
-            "message_type": response.message_type,
-            "payload": response.payload,
-            "recipient": response.recipient,
-        }
+        reports: List[MatchReport] = []
+        if gmc.phase == GamePhase.COMPLETED:
+            reports.append(gmc.get_match_report("GAME_COMPLETED"))
+        resp_dict = None
+        if response is not None:
+            resp_dict = {
+                "message_type": response.message_type,
+                "payload": response.payload,
+                "recipient": response.recipient,
+            }
+        return resp_dict, reports
 
     def get_game(self, match_id: str) -> Optional[GMController]:
         return self._active_games.get(match_id)

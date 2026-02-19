@@ -115,7 +115,7 @@ class TestRouteQ21Message:
         lm.set_assignments(1, _make_assignments(1, count=2))
         lm.start_round(1)
         match_ids = lm.get_active_match_ids()
-        response = lm.route_q21_message(
+        response, reports = lm.route_q21_message(
             Q21Handler.WARMUP_CALL,
             {"match_id": match_ids[0], "warmup_question": "2+2"},
             "ref1@test.com",
@@ -130,12 +130,44 @@ class TestRouteQ21Message:
         lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")
         lm.set_assignments(1, _make_assignments(1, count=1))
         lm.start_round(1)
-        response = lm.route_q21_message(
+        response, reports = lm.route_q21_message(
             Q21Handler.WARMUP_CALL,
             {"match_id": "NONEXISTENT", "warmup_question": "2+2"},
             "ref@test.com",
         )
         assert response is None
+        assert reports == []
+
+
+class TestCompletionReports:
+    def test_route_score_feedback_returns_completion_report(self):
+        lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")
+        lm.set_assignments(1, _make_assignments(1, count=1))
+        lm.start_round(1)
+        match_id = lm.get_active_match_ids()[0]
+        response, reports = lm.route_q21_message(
+            Q21Handler.SCORE_FEEDBACK,
+            {"match_id": match_id, "league_points": 85,
+             "private_score": 0.9, "breakdown": {}},
+            "ref1@test.com",
+        )
+        assert response is None  # SCORE_FEEDBACK has no response
+        assert len(reports) == 1
+        assert reports[0].status == "COMPLETED"
+        assert reports[0].league_points == 85
+
+    def test_route_non_terminal_returns_no_report(self):
+        lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")
+        lm.set_assignments(1, _make_assignments(1, count=1))
+        lm.start_round(1)
+        match_id = lm.get_active_match_ids()[0]
+        response, reports = lm.route_q21_message(
+            Q21Handler.WARMUP_CALL,
+            {"match_id": match_id, "warmup_question": "2+2"},
+            "ref1@test.com",
+        )
+        assert response is not None
+        assert len(reports) == 0
 
 
 class TestIsRoundComplete:
