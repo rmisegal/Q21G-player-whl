@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 2.1.0
+Version: 2.2.0
 
 ## Document Info
 - **Area**: League Management
@@ -85,12 +85,12 @@ _infra/
 │   ├── controller.py                  # ~97 lines - RLGMController orchestrator
 │   ├── league_handler.py              # ~228 lines - League broadcasts
 │   ├── round_lifecycle.py             # ~143 lines - RoundLifecycleManager (NEW)
-│   ├── termination.py                 # ~63 lines - GamePhase, TerminationReport (NEW)
+│   ├── termination.py                 # ~76 lines - GamePhase, MatchReport
 │   └── gprm.py                        # ~111 lines - GPRM, GameResult, GPRMBuilder
 │
 ├── gmc/                               # GMC Package
 │   ├── __init__.py                    # Package exports
-│   ├── controller.py                  # ~139 lines - GMController with phase tracking
+│   ├── controller.py                  # ~150 lines - GMController with phase + score tracking
 │   ├── q21_handler.py                 # ~125 lines - Q21 message types + dispatch
 │   └── game_executor.py               # ~256 lines - PlayerAI callback execution
 │
@@ -160,11 +160,11 @@ RLGMController
 ```
 
 **Key Methods:**
-- `start_round(N)` — Stops current round (if any), creates fresh GMControllers per assignment, returns GPRMs + termination reports
-- `stop_current_round(reason)` — Force-stops all incomplete games, returns TerminationReports
-- `route_q21_message(type, payload, sender)` — Routes Q21 messages to correct GMController by match_id
+- `start_round(N)` — Stops current round (if any), creates fresh GMControllers per assignment, returns GPRMs + match reports
+- `stop_current_round(reason)` — Force-stops all incomplete games, returns MatchReports
+- `route_q21_message(type, payload, sender)` — Routes Q21 messages to correct GMController by match_id; returns `Tuple[Optional[dict], List[MatchReport]]` — includes a completion report after `Q21SCOREFEEDBACK`
 
-### 6.2 GamePhase and TerminationReport
+### 6.2 GamePhase and MatchReport
 
 ```
 GamePhase: INITIALIZED → WARMUP_COMPLETE → QUESTIONS_SENT → GUESS_SUBMITTED → COMPLETED
@@ -172,16 +172,21 @@ GamePhase: INITIALIZED → WARMUP_COMPLETE → QUESTIONS_SENT → GUESS_SUBMITTE
                                                                             TERMINATED
 ```
 
-When a round transition force-stops an incomplete game, a `TerminationReport` captures the game state snapshot and converts to a `MATCH_RESULT_REPORT` protocol message sent to the LGM.
+A `MatchReport` captures the game state snapshot and converts to a `MATCH_RESULT_REPORT` protocol message. It is generated in two cases:
+- **Completion** (status `"COMPLETED"`) — after `Q21SCOREFEEDBACK`, includes `league_points`, `private_score`, `breakdown`
+- **Termination** (status `"TERMINATED"`) — when a round transition force-stops an incomplete game, no scores
+
+Reports bubble up through `RoutingResult.match_reports` for the transport layer to send to the LGM.
 
 ### 6.3 GMController Phase Tracking
 
 Each GMController tracks:
 - `phase` — Current GamePhase
-- `last_sent` / `last_received` — Message history for termination reporting
+- `last_sent` / `last_received` — Message history for reporting
+- Score data (`league_points`, `private_score`, `breakdown`) — stored from `Q21SCOREFEEDBACK`
 - `initialize()` — Set up for a specific game
 - `terminate()` — Mark as TERMINATED
-- `get_termination_report(reason)` — Snapshot state
+- `get_match_report(reason)` — Snapshot state with status based on phase
 
 ---
 
