@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 2.0.0
+Version: 2.1.0
 
 ## Document Info
 - **Area**: League Management
@@ -65,11 +65,11 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 │    LEAGUE MANAGER       │      │       REFEREE           │
 │    (via Gmail)          │      │       (via Gmail)       │
 │                         │      │                         │
-│ - BROADCAST_START_SEASON│      │ - Q21_WARMUP_CALL       │
-│ - BROADCAST_ASSIGNMENT  │      │ - Q21_ROUND_START       │
-│ - BROADCAST_NEW_ROUND   │      │ - Q21_ANSWERS_BATCH     │
-│ - BROADCAST_KEEP_ALIVE  │      │ - Q21_SCORE_FEEDBACK    │
-│ - LEAGUE_COMPLETED      │      │                         │
+│ - BROADCAST_START_SEASON│      │ - Q21WARMUPCALL         │
+│ - BROADCAST_ASSIGNMENT  │      │ - Q21ROUNDSTART         │
+│ - BROADCAST_NEW_ROUND   │      │ - Q21ANSWERSBATCH       │
+│ - LEAGUE_COMPLETED      │      │ - Q21SCOREFEEDBACK      │
+│                         │      │                         │
 └─────────────────────────┘      └─────────────────────────┘
 ```
 
@@ -110,21 +110,21 @@ from typing import Optional
 class GPRM:
     """Game Parameters - immutable input to GMC."""
     # Identity
-    match_id: str           # e.g., "S1R2G003"
-    game_id: str            # e.g., "0102003"
+    match_id: str           # Same as game_id (e.g., "0102003")
+    game_id: str            # 7-digit SSRRGGG format (e.g., "0102003")
     season_id: str          # e.g., "SEASON01"
-    round_number: int       # e.g., 2
-    game_number: int        # e.g., 3
+    round_number: int       # Extracted from game_id[2:4]
+    game_number: int        # Extracted from game_id[4:7]
 
     # Participants
     referee_email: str      # From assignment
     opponent_email: Optional[str]
-    my_role: str            # "PLAYER_A", "PLAYER_B", "QUESTIONER"
+    my_role: str            # "PLAYER1" or "PLAYER2" (per protocol)
 
-    # Game content
+    # Game content (populated from Q21ROUNDSTART, empty at assignment time)
     book_name: str          # Book/lecture title
     book_hint: str          # Description (15 words)
-    association_domain: str # Domain for associative word
+    association_word: str   # Word from association domain
 
     # Authentication
     auth_token: str
@@ -194,26 +194,22 @@ Each GMController tracks:
 | LM -> RLGM | `BROADCAST_START_SEASON` | `league_handler.handle_start_season()` | `SEASON_REGISTRATION_REQUEST` |
 | LM -> RLGM | `SEASON_REGISTRATION_RESPONSE` | `league_handler.handle_registration_response()` | None |
 | LM -> RLGM | `BROADCAST_ASSIGNMENT_TABLE` | `league_handler.handle_assignment_table()` | `GROUP_ASSIGNMENT_RESPONSE` |
-| LM -> RLGM | `BROADCAST_NEW_LEAGUE_ROUND` | `league_handler.handle_new_league_round()` | None (triggers games) |
-| LM -> RLGM | `BROADCAST_ROUND_RESULTS` | `league_handler.handle_round_results()` | None (updates scores) |
-| LM -> RLGM | `BROADCAST_KEEP_ALIVE` | `league_handler.handle_keep_alive()` | `KEEP_ALIVE_RESPONSE` |
-| LM -> RLGM | `BROADCAST_CRITICAL_PAUSE` | `league_handler.handle_critical_pause()` | `CRITICAL_PAUSE_RESPONSE` |
-| LM -> RLGM | `BROADCAST_CRITICAL_CONTINUE` | `league_handler.handle_critical_continue()` | `CRITICAL_CONTINUE_RESPONSE` |
-| LM -> RLGM | `BROADCAST_CRITICAL_RESET` | `league_handler.handle_critical_reset()` | `CRITICAL_RESET_RESPONSE` |
-| LM -> RLGM | `LEAGUE_COMPLETED` | `league_handler.handle_league_completed()` | None |
+| LM -> RLGM | `BROADCAST_NEW_LEAGUE_ROUND` | `lifecycle.start_round()` via controller | None (stops prev round, starts new games) |
+| LM -> RLGM | `LEAGUE_COMPLETED` | `league_handler.handle_league_completed()` + `lifecycle.stop_current_round()` | None |
 
 ### 7.2 GMC <-> Referee
 
+Message names follow Q21G.v1 protocol (no underscores).
+
 | Direction | Message | Handler | Callback |
 |-----------|---------|---------|----------|
-| REF -> GMC | `Q21_WARMUP_CALL` | `game_executor.execute_warmup()` | `get_warmup_answer()` |
-| GMC -> REF | `Q21_WARMUP_RESPONSE` | | |
-| REF -> GMC | `Q21_ROUND_START` | `game_executor.handle_round_start()` | None |
-| REF -> GMC | `Q21_QUESTIONS_CALL` | `game_executor.execute_questions()` | `get_questions()` |
-| GMC -> REF | `Q21_QUESTIONS_BATCH` | | |
-| REF -> GMC | `Q21_ANSWERS_BATCH` | `game_executor.execute_guess()` | `get_guess()` |
-| GMC -> REF | `Q21_GUESS_SUBMISSION` | | |
-| REF -> GMC | `Q21_SCORE_FEEDBACK` | `game_executor.handle_score()` | `on_score_received()` |
+| REF -> GMC | `Q21WARMUPCALL` | `game_executor.execute_warmup()` | `get_warmup_answer()` |
+| GMC -> REF | `Q21WARMUPRESPONSE` | | |
+| REF -> GMC | `Q21ROUNDSTART` | `game_executor.handle_round_start()` + `execute_questions()` | `get_questions()` |
+| GMC -> REF | `Q21QUESTIONSBATCH` | | |
+| REF -> GMC | `Q21ANSWERSBATCH` | `game_executor.execute_guess()` | `get_guess()` |
+| GMC -> REF | `Q21GUESSSUBMISSION` | | |
+| REF -> GMC | `Q21SCOREFEEDBACK` | `game_executor.handle_score()` | `on_score_received()` |
 
 ### 7.3 Score Tracking
 
@@ -235,169 +231,21 @@ class PlayerStandings:
 
 ---
 
-## 8. Code Isolation Plan
+## 8. Historical Notes
 
-### 8.1 Files to REUSE (wrap in RLGM)
-
-| File | Used By |
-|------|---------|
-| `broadcast_handler.py` | `league_handler.py` wraps this |
-| `broadcast_response_builder.py` | `league_handler.py` uses this |
-| `assignment_handler.py` | `league_handler.py` calls this |
-| `season_registration_handler.py` | `league_handler.py` calls this |
-| `standings_handler.py` | `league_handler.py` calls this |
-| `player_gatekeeper.py` | RLGM uses for validation |
-
-### 8.2 Files to REFACTOR into GMC
-
-| Current File | New Location |
-|-------------|--------------|
-| `q21_dispatcher.py` | `gmc/q21_handler.py` |
-| `warmup_handler.py` | Used by `gmc/game_executor.py` |
-| `questions_handler.py` | Used by `gmc/game_executor.py` |
-| `guess_handler.py` | Used by `gmc/game_executor.py` |
-| `answers_handler.py` | Used by `gmc/game_executor.py` |
-| `score_feedback_handler.py` | Used by `gmc/game_executor.py` |
-
-### 8.3 NEW Files to Create
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `_infra/rlgm/__init__.py` | ~20 | Package exports |
-| `_infra/rlgm/controller.py` | ~120 | Main RLGM orchestrator |
-| `_infra/rlgm/league_handler.py` | ~100 | Wraps broadcast handlers |
-| `_infra/rlgm/round_lifecycle.py` | ~143 | Round lifecycle management |
-| `_infra/rlgm/termination.py` | ~63 | GamePhase enum, TerminationReport |
-| `_infra/rlgm/gprm.py` | ~50 | GPRM dataclass + builder |
-| `_infra/rlgm/game_scheduler.py` | ~80 | Game scheduling logic |
-| `_infra/gmc/__init__.py` | ~15 | Package exports |
-| `_infra/gmc/controller.py` | ~100 | Game lifecycle orchestrator |
-| `_infra/gmc/game_executor.py` | ~80 | Executes game phases |
+> Sections 8-10 from PRD v1.x documented initial planning (code isolation,
+> implementation phases, gap fixes). All phases are **completed** as of v2.0.0.
+> See git history for the original planning content.
+>
+> **Key gaps resolved:**
+> - Gap #1 (`on_score_received()` not called) — Fixed in `gmc/game_executor.py`
+> - Gap #2 (`LEAGUE_COMPLETED` not handled) — Fixed in `rlgm/league_handler.py`
+> - Gap #3 (Logging context for game_id) — Fixed in v1.1.0 via `set_game_context()`
+> - Gap #4 (game_id format per message type) — Fixed in v1.3.0 with three context levels
 
 ---
 
-## 9. Implementation Phases
-
-### Phase 0: Documentation
-1. Create `CLAUDE.md` with development guidelines
-2. Create `docs/prd-rlgm.md` with this PRD content
-3. Create `docs/comparison-gmailasplayer-vs-rlgm.md`
-
-### Phase 1: GPRM + GMC Refactor
-1. Create `_infra/rlgm/gprm.py` with GPRM and GameResult
-2. Create `_infra/gmc/` package structure
-3. Refactor `q21_dispatcher.py` into `gmc/q21_handler.py`
-4. Create `gmc/controller.py` wrapping game lifecycle
-5. Create `gmc/game_executor.py` for phase execution
-6. **Fix**: Add `on_score_received()` callback invocation
-
-### Phase 2: RLGM Core
-1. Create `_infra/rlgm/` package structure
-2. Create `league_handler.py` wrapping existing handlers
-3. Create `round_manager.py` for round state
-4. Create `controller.py` as main orchestrator
-5. Create `game_scheduler.py` for scheduling
-6. **Fix**: Add `LEAGUE_COMPLETED` handler
-
-### Phase 3: Integration
-1. Modify `scan_handler.py` to route through RLGM/GMC
-2. Update message routing logic
-3. Test end-to-end flow
-4. Verify all functionality preserved
-
----
-
-## 10. Gap Fixes
-
-### Gap #1: on_score_received() Not Called
-
-**Fix**: In `score_feedback_handler.py` or `gmc/game_executor.py`:
-
-```python
-strategy = get_strategy()
-ctx = {
-    "dynamic": {
-        "league_points": payload.get("league_points", 0),
-        "private_score": payload.get("private_score", 0.0),
-        "breakdown": payload.get("breakdown", {})
-    },
-    "service": {"match_id": match_id}
-}
-strategy.on_score_received(ctx)
-```
-
-### Gap #2: LEAGUE_COMPLETED Not Handled
-
-**Fix**: In `_infra/rlgm/league_handler.py`:
-
-```python
-def handle_league_completed(self, payload: dict) -> None:
-    season_id = payload.get("season_id")
-    final_standings = payload.get("standings", [])
-    self._standings_repo.save_final_standings(season_id, final_standings)
-    self._state_repo.update_state_only(self._player_email, PlayerState.SEASON_COMPLETE)
-```
-
-### Gap #3: Logging Context Not Set for Game ID (Fixed in v1.1.0)
-
-**Problem**: The `ProtocolLogger.set_game_context()` method existed but was never called,
-causing all log messages to show the default game_id `0000000` instead of the actual game_id.
-
-**Fix**: In `_infra/rlgm/controller.py`, added `set_game_context()` call in `process_q21_message()`:
-
-```python
-from _infra.shared.logging.protocol_logger import set_game_context
-
-def process_q21_message(self, msg_type: str, payload: dict, sender: str) -> Optional[dict]:
-    # Set logging context with game_id from payload (match_id == game_id)
-    game_id = payload.get("match_id", "0000000")
-    set_game_context(game_id, player_active=True)
-
-    q21_response = self._gmc.handle_q21_message(msg_type, payload, sender)
-    # ...
-```
-
-Now all Q21 message logs correctly display the 7-digit SSRRGGG game_id.
-
-### Gap #4: Correct game_id Format Per Message Type (Fixed in v1.3.0)
-
-**Problem**: Different message types require different game_id formats and role visibility.
-
-**Solution**: Three context levels with specific formats:
-
-| Context | game_id Format | Role | Messages |
-|---------|---------------|------|----------|
-| Season | SS99999 | empty | START-SEASON, SIGNUP-RESPONSE, ASSIGNMENT-TABLE, SEASON-ENDED |
-| Round | SSRR999 | ACTIVE/INACTIVE | START-ROUND |
-| Game | SSRRGGG | ACTIVE/INACTIVE | All Q21 messages |
-
-**Implementation**:
-
-1. Split `protocol_logger.py` into `constants.py` + `protocol_logger.py` (under 150 lines each)
-2. Created `cli/log_context.py` for context-setting logic (43 lines)
-3. Added three context methods:
-
-```python
-# In protocol_logger.py
-def set_season_context()  # SS99999, empty role
-def set_round_context(round_number, player_active)  # SSRR999, with role
-def set_game_context(game_id, player_active)  # SSRRGGG, with role
-```
-
-4. `scan_handler.py` uses `set_logging_context()` from `cli/log_context.py`:
-
-```python
-from q21_player._infra.cli.log_context import set_logging_context
-
-# In message processing loop
-set_logging_context(normalized_type, game_id, inner, payload, assignment_repo, gatekeeper.current_season_id)
-```
-
-**Result**: Each message type displays the correct game_id format and role visibility.
-
----
-
-## 11. Success Criteria
+## 9. Success Criteria
 
 1. All League Manager broadcasts handled by RLGM
 2. All Q21 messages handled by GMC
