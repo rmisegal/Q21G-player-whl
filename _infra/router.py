@@ -19,7 +19,7 @@ class RoutingResult:
     response: Optional[dict]
     games_to_run: List[GPRM]
     handled: bool
-    termination_reports: List[dict] = field(default_factory=list)
+    match_reports: List[dict] = field(default_factory=list)
 
 
 class MessageRouter:
@@ -78,15 +78,21 @@ class MessageRouter:
             response=response,
             games_to_run=games,
             handled=True,
-            termination_reports=term_reports,
+            match_reports=term_reports,
         )
 
     def _route_q21_message(
         self, msg_type: str, payload: dict[str, Any], sender: str
     ) -> RoutingResult:
         """Route Q21 message to GMC."""
-        response = self._rlgm.process_q21_message(msg_type, payload, sender)
-        return RoutingResult(response=response, games_to_run=[], handled=True)
+        response, reports = self._rlgm.process_q21_message(
+            msg_type, payload, sender
+        )
+        match_reports = [r.to_protocol_message("", "") for r in reports]
+        return RoutingResult(
+            response=response, games_to_run=[], handled=True,
+            match_reports=match_reports,
+        )
 
     def get_rlgm(self) -> RLGMController:
         """Get the RLGM controller for direct access."""

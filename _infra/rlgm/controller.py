@@ -10,7 +10,7 @@ from _infra.gmc.game_executor import PlayerAIProtocol
 from _infra.rlgm.gprm import GPRM
 from _infra.rlgm.league_handler import LeagueHandler, LeagueResponse
 from _infra.rlgm.round_lifecycle import RoundLifecycleManager
-from _infra.rlgm.termination import TerminationReport
+from _infra.rlgm.termination import MatchReport
 
 
 class RLGMController:
@@ -36,14 +36,14 @@ class RLGMController:
         msg_type: str,
         payload: dict[str, Any],
         sender: str,
-    ) -> Tuple[Optional[LeagueResponse], List[GPRM], List[TerminationReport]]:
+    ) -> Tuple[Optional[LeagueResponse], List[GPRM], List[MatchReport]]:
         """Process incoming league message.
 
         Returns:
-            Tuple of (response, games_to_run, termination_reports).
+            Tuple of (response, games_to_run, match_reports).
         """
         games: List[GPRM] = []
-        reports: List[TerminationReport] = []
+        reports: List[MatchReport] = []
         response: Optional[LeagueResponse] = None
 
         if msg_type == LeagueHandler.START_SEASON:
@@ -84,7 +84,7 @@ class RLGMController:
 
     def process_q21_message(
         self, msg_type: str, payload: dict[str, Any], sender: str
-    ) -> Optional[dict]:
+    ) -> Tuple[Optional[dict], List[MatchReport]]:
         """Route Q21 message through lifecycle manager."""
         return self._lifecycle.route_q21_message(msg_type, payload, sender)
 
