@@ -10,13 +10,13 @@ from _infra.gmc.game_executor import GameExecutor, PlayerAIProtocol
 from _infra.gmc.q21_handler import Q21Handler, Q21Response
 
 if TYPE_CHECKING:
-    from _infra.rlgm.termination import GamePhase, TerminationReport
+    from _infra.rlgm.termination import GamePhase, MatchReport
 
 
 def _get_phase_module():
     """Lazy import to avoid circular dependency with rlgm package."""
-    from _infra.rlgm.termination import GamePhase, TerminationReport
-    return GamePhase, TerminationReport
+    from _infra.rlgm.termination import GamePhase, MatchReport
+    return GamePhase, MatchReport
 
 
 def _phase_last_actor(phase) -> str:
@@ -43,6 +43,9 @@ class GMController:
         self._referee_email = ""
         self._last_sent: Optional[str] = None
         self._last_received: Optional[str] = None
+        self._league_points: Optional[int] = None
+        self._private_score: Optional[float] = None
+        self._breakdown: Optional[dict] = None
 
     def initialize(self, match_id: str, game_id: str, round_number: int,
                    season_id: str, referee_email: str) -> None:
@@ -112,24 +115,32 @@ class GMController:
             )
         elif msg_type == Q21Handler.SCORE_FEEDBACK:
             self._last_received = Q21Handler.SCORE_FEEDBACK
+            self._league_points = payload.get("league_points")
+            self._private_score = payload.get("private_score")
+            self._breakdown = payload.get("breakdown")
             self._executor.handle_score(payload)
             self._phase = GP.COMPLETED
             return None
         else:
             raise ValueError(f"Unknown Q21 message type: {msg_type}")
 
-    def get_termination_report(self, reason: str) -> TerminationReport:
-        """Snapshot current state for termination reporting."""
-        _, TR = _get_phase_module()
-        return TR(
+    def get_match_report(self, reason: str) -> MatchReport:
+        """Snapshot current state for match reporting."""
+        GP, MR = _get_phase_module()
+        status = "COMPLETED" if self._phase == GP.COMPLETED else "TERMINATED"
+        return MR(
             match_id=self._match_id, game_id=self._game_id,
             round_number=self._round_number, season_id=self._season_id,
+            status=status,
             phase_at_termination=self._phase.value,
             last_actor=_phase_last_actor(self._phase),
             last_message_sent=self._last_sent or "",
             last_message_received=self._last_received or "",
-            terminated_at=datetime.now(timezone.utc).isoformat(),
+            reported_at=datetime.now(timezone.utc).isoformat(),
             reason=reason,
+            league_points=self._league_points,
+            private_score=self._private_score,
+            breakdown=self._breakdown,
         )
 
     def terminate(self) -> None:

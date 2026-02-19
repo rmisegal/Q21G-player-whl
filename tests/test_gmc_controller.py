@@ -97,7 +97,7 @@ class TestGMControllerMessageTracking:
 
 
 class TestGMControllerTermination:
-    def test_get_termination_report(self):
+    def test_get_match_report_terminated(self):
         gmc = GMController(player_ai=_make_mock_ai())
         gmc.initialize("M001", "0102001", 2, "S01", "ref@test.com")
         gmc.handle_q21_message(
@@ -105,7 +105,8 @@ class TestGMControllerTermination:
             {"match_id": "M001", "warmup_question": "2+2"},
             "ref@test.com",
         )
-        report = gmc.get_termination_report("NEW_ROUND_STARTED")
+        report = gmc.get_match_report("NEW_ROUND_STARTED")
+        assert report.status == "TERMINATED"
         assert report.match_id == "M001"
         assert report.game_id == "0102001"
         assert report.round_number == 2
@@ -122,11 +123,43 @@ class TestGMControllerTermination:
         gmc.terminate()
         assert gmc.phase == GamePhase.TERMINATED
 
-    def test_termination_report_initialized_phase(self):
+    def test_match_report_initialized_phase(self):
         """INITIALIZED: last_actor is NONE (nobody acted yet)."""
         gmc = GMController(player_ai=_make_mock_ai())
         gmc.initialize("M001", "0102001", 2, "S01", "ref@test.com")
-        report = gmc.get_termination_report("NEW_ROUND_STARTED")
+        report = gmc.get_match_report("NEW_ROUND_STARTED")
+        assert report.status == "TERMINATED"
         assert report.last_actor == "NONE"
         assert report.last_message_sent == ""
         assert report.last_message_received == ""
+
+
+class TestGMControllerCompletionReport:
+    def test_completion_report_after_score(self):
+        gmc = GMController(player_ai=_make_mock_ai())
+        gmc.initialize("M001", "0102001", 2, "S01", "ref@test.com")
+        gmc.handle_q21_message(
+            Q21Handler.SCORE_FEEDBACK,
+            {"match_id": "M001", "league_points": 85,
+             "private_score": 0.9, "breakdown": {"accuracy": 0.95}},
+            "ref@test.com",
+        )
+        report = gmc.get_match_report("GAME_COMPLETED")
+        assert report.status == "COMPLETED"
+        assert report.league_points == 85
+        assert report.private_score == 0.9
+        assert report.breakdown == {"accuracy": 0.95}
+        assert report.phase_at_termination == "COMPLETED"
+
+    def test_incomplete_report_has_no_scores(self):
+        gmc = GMController(player_ai=_make_mock_ai())
+        gmc.initialize("M001", "0102001", 2, "S01", "ref@test.com")
+        gmc.handle_q21_message(
+            Q21Handler.WARMUP_CALL,
+            {"match_id": "M001", "warmup_question": "2+2"},
+            "ref@test.com",
+        )
+        report = gmc.get_match_report("NEW_ROUND_STARTED")
+        assert report.status == "TERMINATED"
+        assert report.league_points is None
+        assert report.private_score is None
