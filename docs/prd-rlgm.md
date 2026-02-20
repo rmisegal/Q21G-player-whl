@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 2.2.0
+Version: 2.3.0
 
 ## Document Info
 - **Area**: League Management
@@ -82,9 +82,9 @@ _infra/
 ├── router.py                          # MessageRouter - unified entry point
 ├── rlgm/                              # RLGM Package
 │   ├── __init__.py                    # Package exports
-│   ├── controller.py                  # ~97 lines - RLGMController orchestrator
+│   ├── controller.py                  # ~101 lines - RLGMController orchestrator
 │   ├── league_handler.py              # ~228 lines - League broadcasts
-│   ├── round_lifecycle.py             # ~143 lines - RoundLifecycleManager (NEW)
+│   ├── round_lifecycle.py             # ~153 lines - RoundLifecycleManager
 │   ├── termination.py                 # ~76 lines - GamePhase, MatchReport
 │   └── gprm.py                        # ~111 lines - GPRM, GameResult, GPRMBuilder
 │
@@ -162,7 +162,7 @@ RLGMController
 **Key Methods:**
 - `start_round(N)` — Stops current round (if any), creates fresh GMControllers per assignment, returns GPRMs + match reports
 - `stop_current_round(reason)` — Force-stops all incomplete games, returns MatchReports
-- `route_q21_message(type, payload, sender)` — Routes Q21 messages to correct GMController by match_id; returns `Tuple[Optional[dict], List[MatchReport]]` — includes a completion report after `Q21SCOREFEEDBACK`
+- `route_q21_message(type, payload, sender)` — Routes Q21 messages to correct GMController by match_id; returns `Tuple[Optional[dict], List[MatchReport]]` — includes a completion report after `Q21SCOREFEEDBACK`. Rejects messages for games already in COMPLETED or TERMINATED phase (duplicate guard).
 
 ### 6.2 GamePhase and MatchReport
 
@@ -176,7 +176,7 @@ A `MatchReport` captures the game state snapshot and converts to a `MATCH_RESULT
 - **Completion** (status `"COMPLETED"`) — after `Q21SCOREFEEDBACK`, includes `league_points`, `private_score`, `breakdown`
 - **Termination** (status `"TERMINATED"`) — when a round transition force-stops an incomplete game, no scores
 
-Reports bubble up through `RoutingResult.match_reports` for the transport layer to send to the LGM.
+Reports bubble up through `RoutingResult.match_reports` for the transport layer to send to the LGM. The `reporter` field is populated by the `MessageRouter` with the player's email and role (`"PLAYER"`).
 
 ### 6.3 GMController Phase Tracking
 
