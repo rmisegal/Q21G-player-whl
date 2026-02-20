@@ -37,7 +37,7 @@ HH:MM:SS | GAME-ID: SSRRGGG | SENT/RECEIVED | to/from {email} | MESSAGE-NAME | E
 | Field | Label | Format | Description |
 |-------|-------|--------|-------------|
 | F1 | *(none)* | `HH:MM:SS` | Time (Hour:Minute:Seconds) |
-| F2 | `GAME-ID:` | `SSRRGGG` | Game ID (SS=Season, RR=Round, GGG=Game). Normalized to 7-digit format. |
+| F2 | `GAME-ID:` | `SSRRGGG` | Game ID (SS=Season, RR=Round, GGG=Game). Sentinel values: `SS99999` for season-level, `SSRR999` for round-level, `SSRRGGG` for game-level. |
 | F3 | *(none)* | `SENT` or `RECEIVED` | Direction of email |
 | F4 | `to` or `from` | `{email address}` | Email address with direction prefix |
 | F5 | *(none)* | Message name | Simplified name from lookup table |
@@ -100,16 +100,16 @@ The game_id must always be displayed in 7-digit `SSRRGGG` format. Non-standard f
 ### 5.1 Season Registration Phase
 
 ```
-18:30:00 | GAME-ID: 0100000 | RECEIVED | from server@league.com      | START-SEASON       | EXPECTED-RESPONSE: SEASON-SIGNUP            | ROLE: PLAYER-ACTIVE | DEADLINE: 18:35:00
-18:30:15 | GAME-ID: 0100000 | SENT     | to server@league.com        | SEASON-SIGNUP      | EXPECTED-RESPONSE: SIGNUP-RESPONSE          | ROLE: PLAYER-ACTIVE | DEADLINE: 18:35:00
-18:32:00 | GAME-ID: 0100000 | RECEIVED | from server@league.com      | SIGNUP-RESPONSE    | EXPECTED-RESPONSE: Wait for ASSIGNMENT-TABLE | ROLE: PLAYER-ACTIVE | DEADLINE: 18:45:00
-18:45:00 | GAME-ID: 0100000 | RECEIVED | from server@league.com      | ASSIGNMENT-TABLE   | EXPECTED-RESPONSE: Wait for START-ROUND     | ROLE: PLAYER-ACTIVE | DEADLINE: 19:00:00
+18:30:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | START-SEASON       | EXPECTED-RESPONSE: SEASON-SIGNUP            | ROLE:  | DEADLINE: 18:35:00
+18:30:15 | GAME-ID: 0199999 | SENT     | to server@league.com        | SEASON-SIGNUP      | EXPECTED-RESPONSE: SIGNUP-RESPONSE          | ROLE:  | DEADLINE: 18:35:00
+18:32:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | SIGNUP-RESPONSE    | EXPECTED-RESPONSE: Wait for ASSIGNMENT-TABLE | ROLE:  | DEADLINE: 18:45:00
+18:45:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | ASSIGNMENT-TABLE   | EXPECTED-RESPONSE: Wait for START-ROUND     | ROLE:  | DEADLINE: 19:00:00
 ```
 
 ### 5.2 Game Round Phase (Active Player)
 
 ```
-19:00:00 | GAME-ID: 0101001 | RECEIVED | from server@league.com      | START-ROUND        | EXPECTED-RESPONSE: Wait for PING-CALL       | ROLE: PLAYER-ACTIVE | DEADLINE: 19:05:00
+19:00:00 | GAME-ID: 0101999 | RECEIVED | from server@league.com      | START-ROUND        | EXPECTED-RESPONSE: Wait for PING-CALL       | ROLE: PLAYER-ACTIVE | DEADLINE: 19:05:00
 19:00:30 | GAME-ID: 0101001 | RECEIVED | from referee@example.com    | PING-CALL          | EXPECTED-RESPONSE: PING-RESPONSE            | ROLE: PLAYER-ACTIVE | DEADLINE: 19:02:30
 19:00:45 | GAME-ID: 0101001 | SENT     | to referee@example.com      | PING-RESPONSE      | EXPECTED-RESPONSE: Wait for START-GAME      | ROLE: PLAYER-ACTIVE | DEADLINE: 19:05:00
 19:05:00 | GAME-ID: 0101001 | RECEIVED | from referee@example.com    | START-GAME         | EXPECTED-RESPONSE: ASK-20-QUESTIONS         | ROLE: PLAYER-ACTIVE | DEADLINE: 19:10:00
@@ -122,13 +122,13 @@ The game_id must always be displayed in 7-digit `SSRRGGG` format. Non-standard f
 ### 5.3 Game Round Phase (Inactive Player)
 
 ```
-19:00:00 | GAME-ID: 0101002 | RECEIVED | from server@league.com      | START-ROUND        | EXPECTED-RESPONSE: Wait for PING-CALL       | ROLE: PLAYER-INACTIVE | DEADLINE: 19:30:00
+19:00:00 | GAME-ID: 0101999 | RECEIVED | from server@league.com      | START-ROUND        | EXPECTED-RESPONSE: Wait for PING-CALL       | ROLE: PLAYER-INACTIVE | DEADLINE: 19:30:00
 ```
 
 ### 5.4 Season End
 
 ```
-21:45:00 | GAME-ID: 0106000 | RECEIVED | from server@league.com      | SEASON-ENDED       | EXPECTED-RESPONSE: None (terminal)          | ROLE: PLAYER-ACTIVE | DEADLINE: --:--:--
+21:45:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | SEASON-ENDED       | EXPECTED-RESPONSE: None (terminal)          | ROLE:  | DEADLINE: --:--:--
 ```
 
 ---
@@ -194,11 +194,11 @@ HH:MM:SS:MS | CALLBACK: {function_name} | CALL/RESPONSE | ROLE: PLAYER
 A complete player session showing both protocol (green) and callback (orange) logs:
 
 ```
-[GREEN]  18:30:00 | GAME-ID: 0100000 | RECEIVED | from server@league.com      | START-SEASON       | EXPECTED-RESPONSE: SEASON-SIGNUP            | ROLE: PLAYER-ACTIVE | DEADLINE: 18:35:00
-[GREEN]  18:30:15 | GAME-ID: 0100000 | SENT     | to server@league.com        | SEASON-SIGNUP      | EXPECTED-RESPONSE: SIGNUP-RESPONSE          | ROLE: PLAYER-ACTIVE | DEADLINE: 18:35:00
-[GREEN]  18:32:00 | GAME-ID: 0100000 | RECEIVED | from server@league.com      | SIGNUP-RESPONSE    | EXPECTED-RESPONSE: Wait for ASSIGNMENT-TABLE | ROLE: PLAYER-ACTIVE | DEADLINE: 18:45:00
-[GREEN]  18:45:00 | GAME-ID: 0100000 | RECEIVED | from server@league.com      | ASSIGNMENT-TABLE   | EXPECTED-RESPONSE: Wait for START-ROUND     | ROLE: PLAYER-ACTIVE | DEADLINE: 19:00:00
-[GREEN]  19:00:00 | GAME-ID: 0101001 | RECEIVED | from server@league.com      | START-ROUND        | EXPECTED-RESPONSE: Wait for PING-CALL       | ROLE: PLAYER-ACTIVE | DEADLINE: 19:05:00
+[GREEN]  18:30:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | START-SEASON       | EXPECTED-RESPONSE: SEASON-SIGNUP            | ROLE:  | DEADLINE: 18:35:00
+[GREEN]  18:30:15 | GAME-ID: 0199999 | SENT     | to server@league.com        | SEASON-SIGNUP      | EXPECTED-RESPONSE: SIGNUP-RESPONSE          | ROLE:  | DEADLINE: 18:35:00
+[GREEN]  18:32:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | SIGNUP-RESPONSE    | EXPECTED-RESPONSE: Wait for ASSIGNMENT-TABLE | ROLE:  | DEADLINE: 18:45:00
+[GREEN]  18:45:00 | GAME-ID: 0199999 | RECEIVED | from server@league.com      | ASSIGNMENT-TABLE   | EXPECTED-RESPONSE: Wait for START-ROUND     | ROLE:  | DEADLINE: 19:00:00
+[GREEN]  19:00:00 | GAME-ID: 0101999 | RECEIVED | from server@league.com      | START-ROUND        | EXPECTED-RESPONSE: Wait for PING-CALL       | ROLE: PLAYER-ACTIVE | DEADLINE: 19:05:00
 [GREEN]  19:00:30 | GAME-ID: 0101001 | RECEIVED | from referee@example.com    | PING-CALL          | EXPECTED-RESPONSE: PING-RESPONSE            | ROLE: PLAYER-ACTIVE | DEADLINE: 19:02:30
 [ORANGE] 19:00:32:345 | CALLBACK: answer_warmup      | CALL     | ROLE: PLAYER
 [ORANGE] 19:00:44:678 | CALLBACK: answer_warmup      | RESPONSE | ROLE: PLAYER

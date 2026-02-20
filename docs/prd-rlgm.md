@@ -33,7 +33,7 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           STUDENT LAYER                                  │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │  my_player.py (StudentPlayerAI)                                  │    │
+│  │  my_player.py (MyPlayerAI)                                       │    │
 │  │  ├── get_warmup_answer(ctx) -> {"answer": str}                   │    │
 │  │  ├── get_questions(ctx) -> {"questions": [...]}                  │    │
 │  │  ├── get_guess(ctx) -> {"opening_sentence": ..., ...}            │    │
@@ -55,7 +55,6 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 │  │  │ LeagueHandler  │  │<────────│  │ GameExecutor   │  │             │
 │  │  │ Lifecycle Mgr  │  │         │  │ Q21Handler     │  │             │
 │  │  └────────────────┘  │         │  └────────────────┘  │             │
-│  │  └────────────────┘  │         │                      │             │
 │  └──────────┬───────────┘         └──────────┬───────────┘             │
 │             │                                │                          │
 └─────────────┼────────────────────────────────┼──────────────────────────┘
@@ -65,11 +64,11 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 │    LEAGUE MANAGER       │      │       REFEREE           │
 │    (via Gmail)          │      │       (via Gmail)       │
 │                         │      │                         │
-│ - BROADCAST_START_SEASON    │      │ - Q21WARMUPCALL         │
-│ - BROADCAST_ASSIGNMENT_TABLE│      │ - Q21ROUNDSTART         │
-│ - BROADCAST_NEW_LEAGUE_ROUND│      │ - Q21ANSWERSBATCH       │
-│ - LEAGUE_COMPLETED          │      │ - Q21SCOREFEEDBACK      │
-│                         │      │                         │
+│ - BROADCAST_START_SEASON     │      │ - Q21WARMUPCALL         │
+│ - SEASON_REGISTRATION_RESP  │      │ - Q21ROUNDSTART         │
+│ - BROADCAST_ASSIGNMENT_TABLE│      │ - Q21ANSWERSBATCH       │
+│ - BROADCAST_NEW_LEAGUE_ROUND│      │ - Q21SCOREFEEDBACK      │
+│ - LEAGUE_COMPLETED          │      │                         │
 └─────────────────────────┘      └─────────────────────────┘
 ```
 
