@@ -1,5 +1,5 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 2.3.0
+Version: 2.4.0
 
 ## Document Info
 - **Area**: League Management
@@ -54,7 +54,7 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 │  │  ┌───────▼────────┐  │ Result  │  ┌───────▼────────┐  │             │
 │  │  │ LeagueHandler  │  │<────────│  │ GameExecutor   │  │             │
 │  │  │ Lifecycle Mgr  │  │         │  │ Q21Handler     │  │             │
-│  │  │ GPRMBuilder    │  │         │  └────────────────┘  │             │
+│  │  └────────────────┘  │         │  └────────────────┘  │             │
 │  │  └────────────────┘  │         │                      │             │
 │  └──────────┬───────────┘         └──────────┬───────────┘             │
 │             │                                │                          │
@@ -65,10 +65,10 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 │    LEAGUE MANAGER       │      │       REFEREE           │
 │    (via Gmail)          │      │       (via Gmail)       │
 │                         │      │                         │
-│ - BROADCAST_START_SEASON│      │ - Q21WARMUPCALL         │
-│ - BROADCAST_ASSIGNMENT  │      │ - Q21ROUNDSTART         │
-│ - BROADCAST_NEW_ROUND   │      │ - Q21ANSWERSBATCH       │
-│ - LEAGUE_COMPLETED      │      │ - Q21SCOREFEEDBACK      │
+│ - BROADCAST_START_SEASON    │      │ - Q21WARMUPCALL         │
+│ - BROADCAST_ASSIGNMENT_TABLE│      │ - Q21ROUNDSTART         │
+│ - BROADCAST_NEW_LEAGUE_ROUND│      │ - Q21ANSWERSBATCH       │
+│ - LEAGUE_COMPLETED          │      │ - Q21SCOREFEEDBACK      │
 │                         │      │                         │
 └─────────────────────────┘      └─────────────────────────┘
 ```
@@ -79,22 +79,27 @@ The RLGM (Referee-League Game Manager) is a middleware component that sits betwe
 
 ```
 _infra/
-├── router.py                          # MessageRouter - unified entry point
+├── __init__.py                        # Package exports
+├── router.py                          # ~105 lines - MessageRouter - unified entry point
+├── demo_ai.py                         # ~84 lines - DemoAI for testing
+├── _license.py                        # ~49 lines - License verification
 ├── rlgm/                              # RLGM Package
 │   ├── __init__.py                    # Package exports
 │   ├── controller.py                  # ~101 lines - RLGMController orchestrator
-│   ├── league_handler.py              # ~228 lines - League broadcasts
+│   ├── league_handler.py              # ~227 lines - League broadcasts
 │   ├── round_lifecycle.py             # ~153 lines - RoundLifecycleManager
-│   ├── termination.py                 # ~76 lines - GamePhase, MatchReport
-│   └── gprm.py                        # ~111 lines - GPRM, GameResult, GPRMBuilder
+│   ├── termination.py                 # ~75 lines - GamePhase, MatchReport
+│   └── gprm.py                        # ~110 lines - GPRM, GameResult
 │
 ├── gmc/                               # GMC Package
 │   ├── __init__.py                    # Package exports
-│   ├── controller.py                  # ~150 lines - GMController with phase + score tracking
-│   ├── q21_handler.py                 # ~125 lines - Q21 message types + dispatch
-│   └── game_executor.py               # ~256 lines - PlayerAI callback execution
+│   ├── controller.py                  # ~149 lines - GMController with phase + score tracking
+│   ├── q21_handler.py                 # ~124 lines - Q21 message types + dispatch
+│   └── game_executor.py               # ~255 lines - PlayerAI callback execution
 │
 └── shared/logging/                    # Protocol logging
+    ├── protocol_logger.py             # ~149 lines - Colored protocol output
+    └── constants.py                   # ~71 lines - Display names, expected responses
 ```
 
 ---
@@ -138,7 +143,7 @@ class GameResult:
     status: str             # COMPLETED, FAILED, TIMEOUT
     league_points: int
     private_score: float
-    breakdown: dict
+    breakdown: dict = field(default_factory=dict)
     error: Optional[str] = None
 ```
 
@@ -172,11 +177,11 @@ GamePhase: INITIALIZED → WARMUP_COMPLETE → QUESTIONS_SENT → GUESS_SUBMITTE
                                                                             TERMINATED
 ```
 
-A `MatchReport` captures the game state snapshot and converts to a `MATCH_RESULT_REPORT` protocol message. It is generated in two cases:
+A `MatchReport` captures the game state snapshot and converts to a `MATCH_RESULT_REPORT` protocol message via `to_protocol_message(reporter_email, reporter_role)`. Fields: `match_id`, `game_id`, `round_number`, `season_id`, `status`, `phase_at_termination`, `last_actor`, `last_message_sent`, `last_message_received`, `reported_at` (ISO timestamp), `reason`, and optional score fields (`league_points`, `private_score`, `breakdown`). It is generated in two cases:
 - **Completion** (status `"COMPLETED"`) — after `Q21SCOREFEEDBACK`, includes `league_points`, `private_score`, `breakdown`
 - **Termination** (status `"TERMINATED"`) — when a round transition force-stops an incomplete game, no scores
 
-Reports bubble up through `RoutingResult.match_reports` for the transport layer to send to the LGM. The `reporter` field is populated by the `MessageRouter` with the player's email and role (`"PLAYER"`).
+Reports bubble up through `RoutingResult.match_reports` for the transport layer to send to the LGM. The `MessageRouter` passes the player's email and role (`"PLAYER"`) to `to_protocol_message()`, which adds them as the `reporter` dict in the protocol message.
 
 ### 6.3 GMController Phase Tracking
 
@@ -212,27 +217,13 @@ Message names follow Q21G.v1 protocol (no underscores).
 | GMC -> REF | `Q21WARMUPRESPONSE` | | |
 | REF -> GMC | `Q21ROUNDSTART` | `game_executor.handle_round_start()` + `execute_questions()` | `get_questions()` |
 | GMC -> REF | `Q21QUESTIONSBATCH` | | |
-| REF -> GMC | `Q21ANSWERSBATCH` | `game_executor.execute_guess()` | `get_guess()` |
+| REF -> GMC | `Q21ANSWERSBATCH` | `game_executor.receive_answers()` + `execute_guess()` | `get_guess()` |
 | GMC -> REF | `Q21GUESSSUBMISSION` | | |
 | REF -> GMC | `Q21SCOREFEEDBACK` | `game_executor.handle_score()` | `on_score_received()` |
 
 ### 7.3 Score Tracking
 
-The player tracks scores internally for:
-- Knowing league standing
-- Optimizing callback strategies
-
-```python
-@dataclass
-class PlayerStandings:
-    season_id: str
-    round_number: int
-    total_score: float
-    games_played: int
-    games_won: int
-    rank: int
-    history: list[RoundResult]
-```
+Per-game scores (`league_points`, `private_score`, `breakdown`) are stored in `GMController` when `Q21SCOREFEEDBACK` is received, and included in the `MatchReport` for completed games. Cross-game aggregation (standings, win tracking) is not yet implemented.
 
 ---
 
@@ -255,11 +246,11 @@ class PlayerStandings:
 1. All League Manager broadcasts handled by RLGM
 2. All Q21 messages handled by GMC
 3. GPRM correctly populated from assignments
-4. GMC returns GameResult to RLGM
+4. GMC produces MatchReport on game completion or termination
 5. All 4 PlayerAI callbacks invoked correctly
 6. No functionality gaps vs GmailAsPlayer
 7. Students only see PlayerAI interface
-8. All files under 150 lines
+8. All files under 150 lines (known violations: `game_executor.py` ~255, `league_handler.py` ~227)
 9. No hardcoded values
-10. Player score tracking for optimization
+10. Per-game score tracking in GMController (cross-game aggregation: future work)
 11. TDD approach with tests first

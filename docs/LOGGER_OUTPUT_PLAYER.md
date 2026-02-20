@@ -1,6 +1,6 @@
 # Logger Output PRD - Player Perspective
 
-**Version:** 1.3
+**Version:** 1.4
 **Status:** CANONICAL REFERENCE
 **Last Updated:** 2026-02-11
 
@@ -52,7 +52,7 @@ HH:MM:SS | GAME-ID: SSRRGGG | SENT/RECEIVED | to/from {email} | MESSAGE-NAME | E
 | `PLAYER-ACTIVE` | Player is participating in the current game/round |
 | `PLAYER-INACTIVE` | Player is NOT participating in the current game/round |
 
-**Rule:** Q21 messages (game-level) always imply `PLAYER-ACTIVE`. The referee only sends Q21 messages to participating players. The `PLAYER-INACTIVE` status only applies to round-level `START-ROUND` messages when the player has no assignments for that round.
+**Rule:** Q21 messages (game-level) always imply `PLAYER-ACTIVE`. The referee only sends Q21 messages to participating players. The `PLAYER-INACTIVE` status only applies to round-level `START-ROUND` messages when the player has no assignments for that round. For season-level messages (e.g., `START-SEASON`, `SIGNUP-RESPONSE`), the role field is empty (prints `ROLE:` with no value).
 
 ### 3.4 Game ID Normalization (F2)
 
@@ -64,7 +64,7 @@ The game_id must always be displayed in 7-digit `SSRRGGG` format. Non-standard f
 | Training format | Extract trailing 7 digits | `TRAIN_2026-02-11_0900_0102001` → `0102001` |
 | Other with trailing digits | Extract trailing 7 digits | `PREFIX_0103002` → `0103002` |
 
-**Implementation:** The `_normalize_game_id()` function in `log_context.py` handles this extraction.
+**Implementation:** The `set_game_context()` method in `protocol_logger.py` stores the game_id directly. Callers are responsible for passing a 7-digit normalized ID.
 
 ---
 
@@ -178,6 +178,13 @@ HH:MM:SS:MS | CALLBACK: {function_name} | CALL/RESPONSE | ROLE: PLAYER
 ```
 19:00:32:345 | CALLBACK: answer_warmup      | CALL     | ROLE: PLAYER
 19:00:44:678 | CALLBACK: answer_warmup      | RESPONSE | ROLE: PLAYER
+```
+
+### 7.4 Score Received Callback
+
+```
+19:18:01:234 | CALLBACK: receive_score      | CALL     | ROLE: PLAYER
+19:18:01:567 | CALLBACK: receive_score      | RESPONSE | ROLE: PLAYER
 ```
 
 ---

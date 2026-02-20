@@ -57,6 +57,7 @@ Q21G-player-whl/
 │   ├── __init__.py              # Package exports
 │   ├── router.py                # MessageRouter - unified entry point
 │   ├── demo_ai.py               # DemoAI for testing
+│   ├── _license.py              # License verification
 │   │
 │   ├── rlgm/                    # League-level components
 │   │   ├── __init__.py
@@ -74,7 +75,8 @@ Q21G-player-whl/
 │   │
 │   └── shared/
 │       └── logging/
-│           └── protocol_logger.py  # Colored protocol logging
+│           ├── protocol_logger.py  # Colored protocol logging
+│           └── constants.py        # Display names, expected responses
 │
 ├── docs/
 │   ├── prd-rlgm.md              # RLGM/GMC architecture PRD
