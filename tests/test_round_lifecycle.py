@@ -170,6 +170,30 @@ class TestCompletionReports:
         assert len(reports) == 0
 
 
+    def test_duplicate_score_feedback_ignored(self):
+        lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")
+        lm.set_assignments(1, _make_assignments(1, count=1))
+        lm.start_round(1)
+        match_id = lm.get_active_match_ids()[0]
+        # First SCORE_FEEDBACK → completion report
+        _, reports1 = lm.route_q21_message(
+            Q21Handler.SCORE_FEEDBACK,
+            {"match_id": match_id, "league_points": 85,
+             "private_score": 0.9, "breakdown": {}},
+            "ref1@test.com",
+        )
+        assert len(reports1) == 1
+        # Duplicate SCORE_FEEDBACK → ignored, no extra report
+        response, reports2 = lm.route_q21_message(
+            Q21Handler.SCORE_FEEDBACK,
+            {"match_id": match_id, "league_points": 85,
+             "private_score": 0.9, "breakdown": {}},
+            "ref1@test.com",
+        )
+        assert response is None
+        assert len(reports2) == 0
+
+
 class TestIsRoundComplete:
     def test_not_complete_when_games_active(self):
         lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")

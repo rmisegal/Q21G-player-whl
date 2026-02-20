@@ -63,7 +63,7 @@ Q21G-player-whl/
 │   │   ├── controller.py        # RLGMController
 │   │   ├── league_handler.py    # BROADCAST_* handlers
 │   │   ├── round_lifecycle.py   # RoundLifecycleManager (round transitions)
-│   │   ├── termination.py       # GamePhase enum, TerminationReport
+│   │   ├── termination.py       # GamePhase enum, MatchReport
 │   │   └── gprm.py              # GPRM & GameResult dataclasses
 │   │
 │   ├── gmc/                     # Game-level components

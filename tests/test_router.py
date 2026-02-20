@@ -91,6 +91,8 @@ class TestRouterRoundTransition:
             "lgm@test.com",
         )
         assert len(result.match_reports) == 1
+        assert result.match_reports[0]["reporter"]["email"] == "me@test.com"
+        assert result.match_reports[0]["reporter"]["role"] == "PLAYER"
 
 
 class TestRouterQ21Completion:
@@ -125,3 +127,5 @@ class TestRouterQ21Completion:
         )
         assert len(result.match_reports) == 1
         assert result.match_reports[0]["status"] == "COMPLETED"
+        assert result.match_reports[0]["reporter"]["email"] == "me@test.com"
+        assert result.match_reports[0]["reporter"]["role"] == "PLAYER"

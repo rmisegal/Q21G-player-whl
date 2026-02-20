@@ -73,7 +73,8 @@ class MessageRouter:
                 "payload": league_response.payload,
                 "recipient": league_response.recipient,
             }
-        term_reports = [r.to_protocol_message("", "") for r in reports]
+        email = self._rlgm.player_email
+        term_reports = [r.to_protocol_message(email, "PLAYER") for r in reports]
         return RoutingResult(
             response=response,
             games_to_run=games,
@@ -88,7 +89,8 @@ class MessageRouter:
         response, reports = self._rlgm.process_q21_message(
             msg_type, payload, sender
         )
-        match_reports = [r.to_protocol_message("", "") for r in reports]
+        email = self._rlgm.player_email
+        match_reports = [r.to_protocol_message(email, "PLAYER") for r in reports]
         return RoutingResult(
             response=response, games_to_run=[], handled=True,
             match_reports=match_reports,

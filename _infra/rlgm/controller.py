@@ -27,6 +27,10 @@ class RLGMController:
         self._league_handler = LeagueHandler(player_email, player_name)
         self._lifecycle = RoundLifecycleManager(player_ai=player_ai)
 
+    @property
+    def player_email(self) -> str:
+        return self._player_email
+
     def set_auth_token(self, token: str) -> None:
         """Set authentication token for game requests."""
         self._lifecycle.set_auth_token(token)

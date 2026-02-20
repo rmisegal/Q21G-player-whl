@@ -99,6 +99,12 @@ class RoundLifecycleManager:
                 "Q21 message for unknown match_id %s - stale?", match_id
             )
             return None, []
+        if gmc.phase in (GamePhase.COMPLETED, GamePhase.TERMINATED):
+            logger.warning(
+                "Q21 message for %s game %s - ignoring",
+                gmc.phase.value, match_id,
+            )
+            return None, []
         response = gmc.handle_q21_message(msg_type, payload, sender)
         reports: List[MatchReport] = []
         if gmc.phase == GamePhase.COMPLETED:
