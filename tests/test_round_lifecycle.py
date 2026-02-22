@@ -194,6 +194,17 @@ class TestCompletionReports:
         assert len(reports2) == 0
 
 
+class TestHasAssignments:
+    def test_has_assignments_true(self):
+        lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")
+        lm.set_assignments(1, _make_assignments(1, count=2))
+        assert lm.has_assignments_for_round(1) is True
+
+    def test_has_assignments_false(self):
+        lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")
+        assert lm.has_assignments_for_round(1) is False
+
+
 class TestIsRoundComplete:
     def test_not_complete_when_games_active(self):
         lm = RoundLifecycleManager(player_ai=_make_mock_ai(), season_id="S01")

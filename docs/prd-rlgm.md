@@ -1,11 +1,11 @@
 # PRD: RLGM (Referee-League Game Manager)
-Version: 2.4.0
+Version: 2.5.0
 
 ## Document Info
 - **Area**: League Management
 - **PRD Location**: `docs/prd-rlgm.md`
 - **Comparison Doc**: `docs/comparison-gmailasplayer-vs-rlgm.md`
-- **Related Modules**: `_infra/rlgm/`, `_infra/gmc/`
+- **Related Modules**: `_infra/rlgm/`, `_infra/gmc/`, `_infra/bridge/`
 
 ---
 
@@ -95,6 +95,12 @@ _infra/
 │   ├── controller.py                  # ~149 lines - GMController with phase + score tracking
 │   ├── q21_handler.py                 # ~124 lines - Q21 message types + dispatch
 │   └── game_executor.py               # ~255 lines - PlayerAI callback execution
+│
+├── bridge/                            # Gmail ↔ MessageRouter bridge
+│   ├── __init__.py                    # Package exports
+│   ├── email_parser.py               # ~60 lines - Parse Gmail → ParsedEmail
+│   ├── response_sender.py            # ~50 lines - RoutingResult → Gmail
+│   └── scan_loop.py                  # ~95 lines - scan_once / watch loop
 │
 └── shared/logging/                    # Protocol logging
     ├── protocol_logger.py             # ~149 lines - Colored protocol output
@@ -220,7 +226,34 @@ Message names follow Q21G.v1 protocol (no underscores).
 | GMC -> REF | `Q21GUESSSUBMISSION` | | |
 | REF -> GMC | `Q21SCOREFEEDBACK` | `game_executor.handle_score()` | `on_score_received()` |
 
-### 7.3 Score Tracking
+### 7.3 Bridge Data Flow (v2.5.0)
+
+The bridge layer connects Gmail transport to `MessageRouter`, bypassing the whl's buggy pipeline:
+
+```
+Gmail Inbox → GmailClient.list_messages() → scan_once()
+                                               │
+                    ┌──────────────────────────┘
+                    ▼
+              email_parser.parse_gmail_message(subject, payload)
+                    │
+                    ▼ ParsedEmail
+              MessageRouter.route_message(msg_type, payload, sender)
+                    │
+                    ▼ RoutingResult
+              response_sender.send_routing_result(result, sender, ...)
+                    │
+                    ▼
+              GmailSender.send(to, subject, body, attachment)
+```
+
+Key design decisions:
+- **Persistent Router**: `MessageRouter` is created once in `run.py`, preserving state across scans
+- **Q21 Normalization**: Strips underscores from Q21 types (`Q21_WARMUP_CALL` → `Q21WARMUPCALL`)
+- **Payload Unwrapping**: Extracts inner dict from `{"payload": {...}}` wrapper
+- **No Database**: The bridge is fully in-memory
+
+### 7.4 Score Tracking
 
 Per-game scores (`league_points`, `private_score`, `breakdown`) are stored in `GMController` when `Q21SCOREFEEDBACK` is received, and included in the `MatchReport` for completed games. Cross-game aggregation (standings, win tracking) is not yet implemented.
 

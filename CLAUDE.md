@@ -1,6 +1,6 @@
 # CLAUDE.md
 **IMPORTANT: Read this entire file before making ANY code changes.**
-Version: 1.1.0
+Version: 1.2.0
 
 ## Development Principles
 
@@ -34,6 +34,7 @@ Version: 1.1.0
 | RLGM (League Manager Interface) | `docs/prd-rlgm.md` | `_infra/rlgm/` |
 | GMC (Game Manager Component) | `docs/prd-rlgm.md` | `_infra/gmc/` |
 | Protocol Logging | `docs/LOGGER_OUTPUT_PLAYER.md` | `_infra/shared/logging/` |
+| Bridge (Gmail Transport) | `docs/prd-rlgm.md` | `_infra/bridge/` |
 
 ## Project Structure
 
@@ -66,6 +67,12 @@ Q21G-player-whl/
 │   │   ├── round_lifecycle.py   # RoundLifecycleManager (round transitions)
 │   │   ├── termination.py       # GamePhase enum, MatchReport
 │   │   └── gprm.py              # GPRM & GameResult dataclasses
+│   │
+│   ├── bridge/                  # Gmail ↔ MessageRouter bridge
+│   │   ├── __init__.py
+│   │   ├── email_parser.py     # Parse Gmail → protocol fields
+│   │   ├── response_sender.py  # RoutingResult → outgoing Gmail
+│   │   └── scan_loop.py        # scan_once / watch loop
 │   │
 │   ├── gmc/                     # Game-level components
 │   │   ├── __init__.py

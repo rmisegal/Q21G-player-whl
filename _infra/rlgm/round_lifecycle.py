@@ -1,11 +1,6 @@
 # Area: RLGM (League Manager Interface)
 # PRD: docs/prd-rlgm.md
-"""Round Lifecycle Manager - owns the current round and all its games.
-
-Provides atomic round transitions: stop all current games, start new ones.
-Routes Q21 messages to the correct per-game GMController by match_id.
-Replaces RoundManager with lifecycle-aware round management.
-"""
+"""Round Lifecycle Manager - owns the current round and all its games."""
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -49,14 +44,14 @@ class RoundLifecycleManager:
     ) -> None:
         self._assignments[round_number] = assignments
 
+    def has_assignments_for_round(self, round_number: int) -> bool:
+        """Check if assignments exist for a given round."""
+        return bool(self._assignments.get(round_number, []))
+
     def start_round(
         self, round_number: int
     ) -> Tuple[List[GPRM], List[MatchReport]]:
-        """Stop current round (if any), create new game controllers.
-
-        Returns:
-            Tuple of (GPRMs for new games, MatchReports from stopped).
-        """
+        """Stop current round (if any), create new game controllers."""
         reports = self.stop_current_round("NEW_ROUND_STARTED")
         self._current_round = round_number
         assignments = self._assignments.get(round_number, [])
