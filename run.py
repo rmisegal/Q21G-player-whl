@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Area: Bridge (Gmail to RLGM Integration)
+# PRD: docs/prd-rlgm.md
 """Q21 Player SDK entry point.
 
 Usage:

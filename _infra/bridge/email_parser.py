@@ -18,11 +18,11 @@ class ParsedEmail:
 
 
 def normalize_msg_type(msg_type: str) -> str:
-    """Normalize message type. Strips underscores from Q21 types only."""
+    """Normalize message type. Uppercases all; strips underscores from Q21 types."""
     upper = msg_type.upper()
     if upper.startswith("Q21") and "_" in upper:
         return upper.replace("_", "")
-    return msg_type
+    return upper
 
 
 def parse_gmail_message(

@@ -12,8 +12,11 @@ class TestNormalizeMsgType:
     def test_q21_without_underscores(self):
         assert normalize_msg_type("Q21WARMUPCALL") == "Q21WARMUPCALL"
 
-    def test_league_type_unchanged(self):
+    def test_league_type_uppercased(self):
         assert normalize_msg_type("BROADCAST_START_SEASON") == "BROADCAST_START_SEASON"
+
+    def test_league_type_lowercase_uppercased(self):
+        assert normalize_msg_type("broadcast_start_season") == "BROADCAST_START_SEASON"
 
     def test_q21_round_start(self):
         assert normalize_msg_type("Q21_ROUND_START") == "Q21ROUNDSTART"

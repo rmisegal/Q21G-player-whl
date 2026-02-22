@@ -1,5 +1,7 @@
 # Comparison: GmailAsPlayer vs GMC+RLGM
-Version: 1.0.0
+Version: 1.1.0
+
+> **Note:** This is a historical pre-reform snapshot. References to `round_manager.py` now correspond to `round_lifecycle.py`. The RLGM column references original planning names, not current module names.
 
 This document provides a detailed comparison between the existing GmailAsPlayer implementation and the proposed GMC+RLGM architecture to ensure no functionality gaps.
 

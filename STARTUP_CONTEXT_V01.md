@@ -148,9 +148,9 @@ The `MyPlayerAI` class inherits from `PlayerAI` and has 4 methods to implement:
 ## CLI Commands
 
 ```bash
-q21-player --scan              # Process messages once
-q21-player --watch             # Continuous polling mode
-q21-player --test-connectivity # Test Gmail/database setup
+python run.py --scan              # Process messages once
+python run.py --watch             # Continuous polling mode
+python verify_setup.py            # Test Gmail setup
 ```
 
 ---

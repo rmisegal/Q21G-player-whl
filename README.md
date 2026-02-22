@@ -1,4 +1,5 @@
 # Q21 Player SDK
+Version: 1.1.0
 
 SDK for implementing a Q21 (21-Questions) game player that communicates with the League Manager and Referees via the unified protocol.
 
@@ -132,8 +133,8 @@ The SDK uses a layered architecture for handling protocol messages:
 │  (League-level handling)    │   │   (Game-level handling)     │
 │                             │   │                             │
 │  • LeagueHandler            │   │  • Q21Handler               │
-│  • RoundManager             │   │  • GameExecutor             │
-│  • GPRMBuilder              │   │                             │
+│  • RoundLifecycleManager    │   │  • GameExecutor             │
+│  • Bridge (Gmail transport) │   │                             │
 └─────────────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -145,7 +146,8 @@ The SDK uses a layered architecture for handling protocol messages:
 | **RLGMController** | Handles league broadcasts (registration, assignments, rounds) |
 | **GMController** | Manages Q21 game lifecycle |
 | **LeagueHandler** | Processes BROADCAST_* messages |
-| **RoundManager** | Tracks assignments and builds GPRM objects |
+| **RoundLifecycleManager** | Tracks assignments, manages round transitions |
+| **Bridge** | Wires Gmail transport to MessageRouter (email_parser, response_sender, scan_loop) |
 | **Q21Handler** | Routes Q21 messages to game phases |
 | **GameExecutor** | Executes game phases via PlayerAI callbacks |
 
@@ -188,12 +190,17 @@ Q21G-player-whl/
 ├── _infra/                    # Protocol infrastructure
 │   ├── router.py              # MessageRouter - unified entry point
 │   ├── demo_ai.py             # DemoAI for testing
-│   ├── rlgm/                   # League-level components
+│   ├── rlgm/                  # League-level components
 │   │   ├── controller.py      # RLGMController
 │   │   ├── league_handler.py  # BROADCAST_* handlers
-│   │   ├── round_manager.py   # Assignment tracking
+│   │   ├── round_lifecycle.py # RoundLifecycleManager
+│   │   ├── termination.py     # GamePhase, MatchReport
 │   │   └── gprm.py            # GPRM & GameResult dataclasses
-│   └── gmc/                    # Game-level components
+│   ├── bridge/                # Gmail ↔ MessageRouter bridge
+│   │   ├── email_parser.py    # Parse Gmail → protocol fields
+│   │   ├── response_sender.py # RoutingResult → outgoing Gmail
+│   │   └── scan_loop.py       # scan_once / watch loop
+│   └── gmc/                   # Game-level components
 │       ├── controller.py      # GMController
 │       ├── q21_handler.py     # Q21* message routing
 │       └── game_executor.py   # PlayerAI callback execution
@@ -255,7 +262,7 @@ See `CONFIG_GUIDE.md` for detailed explanations.
 - **Justifications must be 35+ words** - The `sentence_justification` and `word_justification` fields require detailed explanations
 - **20 questions exactly** - `get_questions()` must return exactly 20 questions
 - **Options format** - Each question needs `{"A": "...", "B": "...", "C": "...", "D": "..."}`
-- **Test locally** - Use `--test-connectivity` to verify Gmail and database setup
+- **Test locally** - Run `python verify_setup.py` to verify Gmail setup
 
 ## Demo Mode
 
