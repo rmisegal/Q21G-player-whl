@@ -14,7 +14,7 @@ git clone https://github.com/rmisegal/Q21G-player-whl.git
 cd Q21G-player-whl
 python3 -m venv .venv
 source .venv/bin/activate
-pip install dist/q21_player-1.0.1-py3-none-any.whl
+pip install dist/q21_player-1.0.2-py3-none-any.whl
 ```
 
 #### Windows (PowerShell)
@@ -24,7 +24,7 @@ git clone https://github.com/rmisegal/Q21G-player-whl.git
 cd Q21G-player-whl
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install dist/q21_player-1.0.1-py3-none-any.whl
+pip install dist/q21_player-1.0.2-py3-none-any.whl
 ```
 
 If you get an execution policy error on Windows, run this first:
@@ -38,7 +38,7 @@ When you pull new changes, reinstall the wheel to get updates:
 
 ```bash
 git pull
-pip install --force-reinstall dist/q21_player-1.0.1-py3-none-any.whl
+pip install --force-reinstall dist/q21_player-1.0.2-py3-none-any.whl
 ```
 
 ### 2. Setup Google Cloud (Gmail API)
